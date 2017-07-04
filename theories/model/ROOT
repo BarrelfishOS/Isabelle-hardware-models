@@ -1,0 +1,13 @@
+session "Model" = "HOL" +
+    options [document = pdf, document_output = "../../build/doc/machines"]
+    theories [document = false]
+        WellfoundedExtras
+    theories
+        Model 
+        Resolution
+        Equivalence
+        AbstractOps
+        Syntax
+        ConcreteOps
+    document_files (in ".")
+        "root.tex"
