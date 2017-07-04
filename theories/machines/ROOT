@@ -2,15 +2,15 @@ session "Machines" = "HOL" +
     options [document = pdf, document_output = "../../build/doc/machines"]
     theories
         Examples
-        Desktop
-        DesktopInt
         OMAP44xx
         OMAP44xxInt
+        Desktop
+        DesktopInt
         Server
         ServerInt
-        Cluster
+        Cluster 
+        SCC
         IntroductionPC
         IntroductionPhi
-        SCC
     document_files (in ".")
         "root.tex"

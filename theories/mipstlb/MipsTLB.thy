@@ -312,13 +312,13 @@ definition TLBENTRYHIWellFormed :: "TLBENTRYHI \<Rightarrow> MASK \<Rightarrow> 
   where "TLBENTRYHIWellFormed hi m =((VPN2Valid m (vpn2 hi)) \<and> ASIDValid (asid hi))"
 
     
-text "The null_entry_hi has the VPN2 of 0 and the ASID of 0. "  
+text "The NullEntryHi has the VPN2 of 0 and the ASID of 0. "  
 
 definition null_entry_hi :: TLBENTRYHI
   where "null_entry_hi = \<lparr> vpn2=0, asid=0 \<rparr>"
     
     
-text "The null_entry_hi is valid."    
+text "The NullEntryHi is valid."    
   
 lemma NullEntryHiWellFormed : 
   "TLBENTRYHIWellFormed null_entry_hi MASK4K"
@@ -344,7 +344,7 @@ text "The EntryLo is well formed if the PFN is in the valid range."
 definition TLBENTRYLOWellFormed :: "TLBENTRYLO \<Rightarrow> MASK \<Rightarrow> bool"
   where "TLBENTRYLOWellFormed lo m = (PFNValid m (pfn lo))"
 
-text "The null_entry_lo has PFN, v, d, g, all zeros."
+text "The NullEntryLo has PFN, v, d, g, all zeros."
     
 definition null_entry_lo :: TLBENTRYLO where
   "null_entry_lo = \<lparr> pfn=0, v=False, d=False, g=False \<rparr>"
@@ -384,7 +384,7 @@ definition TLBEntryReset :: "nat \<Rightarrow> TLBENTRY"
   where "TLBEntryReset idx = TLBENTRY.make MASK4K \<lparr> vpn2=(idx * 2), asid=0 \<rparr> 
                                            null_entry_lo null_entry_lo"
 
-text "The null_entry is the rest with index 0"
+text "The NullEntry is the rest with index 0"
 
 definition null_entry :: TLBENTRY where
   "null_entry = TLBEntryReset 0"
@@ -518,7 +518,7 @@ lemma entry_va_consecutive :  "EntryMinVA1 e = Suc (EntryMaxVA0 e)"
   by(simp add:EntryMinVA1_def EntryMaxVA0_def EntryMinVA0_def EntrySize_positive)
 
     
-text "The null_entry has defined minimum and maximum VA."
+text "The NullEntry has defined minimum and maximum VA."
 
 lemma VPN2NullEntry : "vpn2 (hi null_entry) = 0"
   by(auto simp:null_entry_def TLBEntryReset_def TLBENTRY.make_def TLBENTRYHI.make_def)
@@ -1540,7 +1540,7 @@ lemma "\<exists>t. TLB_in_reset t"
   done  
     
 text "We define helper Lemmas that show that the invalid  TLB has
-     all null_entries and that therefore all entries are valid."
+     all nullentries and that therefore all entries are valid."
   
 lemma InvalidTLBAllNullEntries :
   "(entries invalid_tlb) i = null_entry"
@@ -1566,7 +1566,7 @@ lemma NullEntriesMatch :
   by(auto simp:EntryMatch_def NullEntriesVPNMatch NullEntriesASIDMatch)
 
 text "We can now show that the invalid TLB does in fact not satisfy the TLBValid
-      predicate by using the knowledge, that all the entries are null_entries
+      predicate by using the knowledge, that all the entries are nullentries
       and thus are valid and match"
 
 lemma InvalidTLBWired0 : " wired invalid_tlb = 0"
@@ -1795,7 +1795,7 @@ text "Create the decoding net node. Each TLB entry has either zero, one or two m
 subsection "Helper Functions"
 (* ------------------------------------------------------------------------- *) 
   
-text{* Creates a map_spec list from the odd and even entries *}
+text{* Creates a mapspec list from the odd and even entries *}
 
     
 definition EntryToMap :: "nodeid \<Rightarrow> TLBENTRY \<Rightarrow> nat \<Rightarrow>(nat \<times> nat) set"
