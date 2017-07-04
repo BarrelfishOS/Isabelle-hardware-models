@@ -1609,7 +1609,7 @@ text "We can use the lemmas to prove our theorem, that there exist a TLB state
       that satisfies the reset condition and that is invalid at the same time."
     
   
-theorem " \<exists>t. TLB_in_reset t \<longrightarrow> \<not>(TLBValid t)"
+theorem " \<exists>t. TLB_in_reset t \<and> \<not>(TLBValid t)"
   apply(rule exI[where x = invalid_tlb])
   apply(simp add:InvalidTLBInReset InvalidTLBNotValid)
 done
