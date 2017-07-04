@@ -1,0 +1,6 @@
+session "MIPSTLB" = "HOL" +
+    options [document = pdf, document_output = "../../build/doc/mipstlb"]
+    theories
+        MipsTLB
+    document_files (in ".")
+        "root.tex"

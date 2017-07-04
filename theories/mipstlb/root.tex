@@ -1,0 +1,58 @@
+Copyright (c) 2017, ETH Zurich
+% All rights reserved.
+
+% Redistribution and use in source and binary forms, with or without
+% modification, are permitted provided that the following conditions are met:
+
+% 1. Redistributions of source code must retain the above copyright notice, this
+%    list of conditions and the following disclaimer.
+% 2. Redistributions in binary form must reproduce the above copyright notice,
+%    this list of conditions and the following disclaimer in the documentation
+%    and/or other materials provided with the distribution.
+
+% THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+% ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+% WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+% DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+% ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+% (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+% LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+% ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+% (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+% SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+
+\documentclass[11pt,a4paper]{article}
+\usepackage{graphicx,isabelle,isabellesym,latexsym}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{textcomp}
+\usepackage[english]{babel}
+\usepackage[only,bigsqcap]{stmaryrd}
+\usepackage[utf8]{inputenc}
+\usepackage{pdfsetup}
+
+\urlstyle{rm}
+\isabellestyle{it}
+\pagestyle{myheadings}
+
+\begin{document}
+
+\title{Isabelle/HOL --- Higher-Order Logic}
+\maketitle
+
+\tableofcontents
+
+\newpage
+
+\renewcommand{\setisabellecontext}[1]{\markright{THEORY~``#1''}}
+
+\parindent 0pt\parskip 0.5ex
+\input{session}
+
+\pagestyle{headings}
+\bibliographystyle{abbrv}
+\bibliography{root}
+
+\end{document}
