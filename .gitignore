@@ -1,2 +1,3 @@
 build
 *.thy~
+doc/*.pdf
