@@ -1,0 +1,12 @@
+# Hardware Models in Isabelle/HOL
+
+This repository contains a formal model to represent the current hardware configuration (memory and interrupt subsystems) of a machine in Isabelle/HOL.
+
+## Pre Requisites
+
+Isabelle/HOL version 2016-1 
+[[https://www.cl.cam.ac.uk/research/hvg/Isabelle/]]
+
+## Files
+
+## Documentation
