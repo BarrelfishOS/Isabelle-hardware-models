@@ -2,6 +2,15 @@
 
 This repository contains a formal model to represent the current hardware configuration (memory and interrupt subsystems) of a machine in Isabelle/HOL.
 
+## Authors
+
+See the AUTHORS file in the reposotiry.
+
+## License
+
+See the LICENSE file in the repository.
+
+
 ## Pre Requisites
 
 Isabelle/HOL version 2016-1 
@@ -20,4 +29,5 @@ Put the Isabelle binary into your search path such that it is found by Make
 
 ## Documentation
 The documentation can be built using `make documentation` or typing make in the
-doc directory.
+doc directory. This will produce a couple of PDF documents containing the
+models and explanations.
