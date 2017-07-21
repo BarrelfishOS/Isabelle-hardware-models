@@ -96,10 +96,10 @@ primrec frame_count :: "MASK \<Rightarrow> nat" where
 
 
 primrec num_4k_pages :: "MASK \<Rightarrow> nat" where
-  "num_4k_pages(MASK4K)   = 4096" |  "num_4k_pages(MASK16K)  = 1024"   |
-  "num_4k_pages(MASK64K)  = 256"  |  "num_4k_pages(MASK256K) = 64" | 
-  "num_4k_pages(MASK1M)   = 16"   |  "num_4k_pages(MASK4M)   = 4"  | 
-  "num_4k_pages(MASK16M)  = 1"   
+  "num_4k_pages(MASK4K)   = 1"     |  "num_4k_pages(MASK16K)  = 4"   |
+  "num_4k_pages(MASK64K)  = 16"    |  "num_4k_pages(MASK256K) = 64" | 
+  "num_4k_pages(MASK1M)   = 256"   |  "num_4k_pages(MASK4M)   = 1024"  | 
+  "num_4k_pages(MASK16M)  = 40961"   
 
   
 (* ------------------------------------------------------------------------- *)  
@@ -1078,15 +1078,23 @@ text "The VPN matches if their respective virtual addresses fall within the
       ranges. "   
   
 definition EntryMax4KVPN :: "TLBENTRY \<Rightarrow> VPN"
-  where "EntryMax4KVPN e = (num_4k_pages (mask e) * (vpn2 (hi e) + 1)) -1"
+  where "EntryMax4KVPN e = (num_4k_pages (mask e) * (vpn2 (hi e) + 2)) - 1"
     
 definition EntryMin4KVPN :: "TLBENTRY \<Rightarrow> VPN"
   where "EntryMin4KVPN e = num_4k_pages (mask e) * (vpn2 (hi e))"
 
+definition EntryMin4KVPN1 :: "TLBENTRY \<Rightarrow> VPN"
+  where "EntryMin4KVPN1 e = num_4k_pages (mask e) * ((vpn2 (hi e)) + 1)"    
     
 definition EntryVPNMatchV :: "VPN \<Rightarrow> TLBENTRY \<Rightarrow> bool"
   where "EntryVPNMatchV vpn e = ((EntryMin4KVPN e) \<le> vpn \<and> vpn \<le> EntryMax4KVPN e)"
 
+definition EntryVPNMatchV0 :: "VPN \<Rightarrow> TLBENTRY \<Rightarrow> bool"
+  where "EntryVPNMatchV0 vpn e = ((EntryMin4KVPN e) \<le> vpn \<and> vpn < EntryMin4KVPN1 e)"
+
+definition EntryVPNMatchV1 :: "VPN \<Rightarrow> TLBENTRY \<Rightarrow> bool"
+  where "EntryVPNMatchV1 vpn e = ((EntryMin4KVPN1 e) \<le> vpn \<and> vpn \<le> EntryMax4KVPN e)"
+    
     
 definition EntryVPNMatch ::  "TLBENTRY \<Rightarrow> TLBENTRY \<Rightarrow> bool"
   where "EntryVPNMatch e1 e2 = (((EntryRange e1) \<inter> (EntryRange e2)) \<noteq> {})"
@@ -1099,6 +1107,12 @@ subsection "Matching Entry"
 definition EntryMatchVPNASID :: "VPN \<Rightarrow> ASID \<Rightarrow> TLBENTRY \<Rightarrow> bool" 
   where "EntryMatchVPNASID vpn a e = ((EntryVPNMatchV vpn e) \<and> (EntryASIDMatchA a e))"
 
+definition EntryMatchVPNASID0 :: "VPN \<Rightarrow> ASID \<Rightarrow> TLBENTRY \<Rightarrow> bool" 
+  where "EntryMatchVPNASID0 vpn a e = ((EntryVPNMatchV0 vpn e) \<and> (EntryASIDMatchA a e))"
+
+definition EntryMatchVPNASID1 :: "VPN \<Rightarrow> ASID \<Rightarrow> TLBENTRY \<Rightarrow> bool" 
+  where "EntryMatchVPNASID1 vpn a e = ((EntryVPNMatchV1 vpn e) \<and> (EntryASIDMatchA a e))"    
+    
 text "From the definition, the two entry match if their VPNs and ASIDs match."    
   
 definition EntryMatch :: "TLBENTRY \<Rightarrow> TLBENTRY \<Rightarrow> bool" where
@@ -1958,8 +1972,39 @@ proof -
     by(simp add:ConvertToNode_def replace_entry_def)
   finally show ?thesis .
 qed
-    
 
+
+(* ========================================================================= *)  
+section "Translate Function"
+(* ========================================================================= *) 
+
+
+  
+definition TLBENTRY_translate_va :: "TLBENTRY \<Rightarrow> nat \<Rightarrow> nat set"
+  where
+    "TLBENTRY_translate_va e va =
+      (if EntryIsValid0 e \<and> va \<in> EntryExtendedRange0 e then 
+          {EntryPA0 e + ((va mod VASize) - EntryMinVA0 e)} else {}) \<union>
+      (if EntryIsValid1 e \<and> va \<in> EntryExtendedRange1 e then
+           {EntryPA1 e + ((va mod VASize) - EntryMinVA1 e)} else {})"  
+
+definition TLBENTRY_translate :: "TLBENTRY \<Rightarrow> VPN \<Rightarrow> ASID \<Rightarrow> PFN set"
+  where
+    "TLBENTRY_translate e vpn as =
+      (if EntryIsValid0 e \<and> EntryMatchVPNASID0 vpn as e then 
+          {(pfn (lo0 e)) + (vpn - EntryMin4KVPN e)} else {}) \<union>
+      (if EntryIsValid1 e \<and> EntryMatchVPNASID1 vpn as e then
+           {(pfn (lo1 e)) +  (vpn - EntryMin4KVPN1 e)} else {})"      
+
+    
+definition MIPSTLB_translate :: "MIPSTLB \<Rightarrow> VPN \<Rightarrow> ASID \<Rightarrow> PFN set"
+  where "MIPSTLB_translate tlb vpn as = \<Union>{TLBENTRY_translate e vpn as | e i . i < TLBCapacity \<and> e = ((entries tlb) i) }"  
+    
+definition MIPSTLB_translate_va :: "MIPSTLB \<Rightarrow> nat \<Rightarrow> nat set"
+  where "MIPSTLB_translate_va tlb va = {pa | pa e i . i < TLBCapacity \<and> e = ((entries tlb) i) \<and>
+                                                   pa \<in> TLBENTRY_translate_va e va}"  
+      
+    
 (*<*)
 end
 (*>*)
