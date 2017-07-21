@@ -1996,14 +1996,23 @@ definition TLBENTRY_translate :: "TLBENTRY \<Rightarrow> VPN \<Rightarrow> ASID 
       (if EntryIsValid1 e \<and> EntryMatchVPNASID1 vpn as e then
            {(pfn (lo1 e)) +  (vpn - EntryMin4KVPN1 e)} else {})"      
 
+text "The translate function of a reset entry is  always emtpy"
+  
+lemma TLBENTRY_translate_empty:
+  "\<forall>i vpn as. TLBENTRY_translate (TLBEntryReset (i)) vpn as = {}"
+  by(simp add:TLBEntryReset_def TLBENTRY.make_def null_entry_lo_def 
+              TLBENTRY_translate_def EntryIsValid0_def EntryIsValid1_def)
+    
     
 definition MIPSTLB_translate :: "MIPSTLB \<Rightarrow> VPN \<Rightarrow> ASID \<Rightarrow> PFN set"
-  where "MIPSTLB_translate tlb vpn as = \<Union>{TLBENTRY_translate e vpn as | e i . i < TLBCapacity \<and> e = ((entries tlb) i) }"  
-    
-definition MIPSTLB_translate_va :: "MIPSTLB \<Rightarrow> nat \<Rightarrow> nat set"
-  where "MIPSTLB_translate_va tlb va = {pa | pa e i . i < TLBCapacity \<and> e = ((entries tlb) i) \<and>
-                                                   pa \<in> TLBENTRY_translate_va e va}"  
-      
+  where "MIPSTLB_translate tlb vpn as = {pa | i pa . 
+                                                pa \<in> TLBENTRY_translate ((entries tlb) i) vpn as 
+                                                \<and> i < TLBCapacity }"  
+
+text "The translate function of an initialized TLB is always emtpy"
+  
+lemma "MIPSTLB_translate (TLBInit w tlb) vpn as = {}"
+  by(simp add:MIPSTLB_translate_def TLBInit_def TLBENTRY_translate_empty)
     
 (*<*)
 end
