@@ -1701,7 +1701,10 @@ definition tlbwi :: "nat \<Rightarrow> TLBENTRY \<Rightarrow> MIPSTLB \<Rightarr
                             else 
                                UNIV)"
 
-    
+lemma "tlbwi ((vpn2 (hi (e))) mod TLBCapacity) e tlb = {\<lparr> wired = (wired tlb), 
+                  entries = (entries tlb)(((vpn2 (hi (e))) mod TLBCapacity) :=  e) \<rparr>}"
+  by(auto simp add:tlbwi_def TLBCapacity_def)
+  
     
 definition TLBEntryWriteable :: "nat \<Rightarrow> TLBENTRY \<Rightarrow> MIPSTLB \<Rightarrow> bool"
   where "TLBEntryWriteable idx e tlb = ((TLBEntryConflictSet e tlb \<subseteq> {idx}))"
