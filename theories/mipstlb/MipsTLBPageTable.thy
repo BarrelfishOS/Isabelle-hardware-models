@@ -34,10 +34,22 @@ begin
 
 (* ========================================================================= *)  
 section "MIPS Page Table"
-(* ========================================================================= *)    
+(* ========================================================================= *)
+    
+text "The PageTable is a partially defined function from a VPN to an EntryLo
+      and the page table is created for a particular ASID. "
+  
+record MIPSPT = 
+  entry :: "VPN \<Rightarrow> TLBENTRYLO"
+  asid :: ASID
 
+  
+(* ------------------------------------------------------------------------- *)   
+subsection "Maximum number of entries"  
+(* ------------------------------------------------------------------------- *)   
+  
 text "The MIPS PageTable has 256M x 4kB entries to fill the entire 1TB virtual 
-      address space."
+      address space. Thus the maximum number of entries are:"
   
 definition MIPSPT_EntriesMax :: nat
   where "MIPSPT_EntriesMax = 268435456"   
@@ -45,14 +57,32 @@ definition MIPSPT_EntriesMax :: nat
 lemma "MIPSPT_EntriesMax * 4096 = GB 1024"
   by(auto simp:MIPSPT_EntriesMax_def GB_def)
   
-text "The PageTable is a partially defined function from a VPN to an EntryLo
-      and the page table is created for a particular ASID."
+    
+(* ------------------------------------------------------------------------- *)   
+subsection "Wellformed MIPSPT entries"  
+(* ------------------------------------------------------------------------- *)   
   
-record MIPSPT = 
-  entry :: "VPN \<Rightarrow> TLBENTRYLO"
-  asid :: ASID
+text "The MIPSPT entries are wellformed if their TLBENTRYLO is well formed. Thus 
+      we say that the all entries of the TLB are wellformed if all corresponding
+      TLBENTRYLO are wellformed too."
+  
+definition MIPSPT_Entries_wellformed :: "MIPSPT \<Rightarrow> bool"
+  where "MIPSPT_Entries_wellformed pt = 
+        (\<forall>vpn < MIPSPT_EntriesMax. TLBENTRYLOWellFormed ((entry pt) vpn) MASK4K)"
+   
+
+text "A MIPSPT is valid if all its entries are well formed and the ASID is
+      within the valid range."
+  
+definition MIPSPT_valid :: "MIPSPT \<Rightarrow> bool"
+  where "MIPSPT_valid pt = ((ASIDValid (asid pt))  \<and> (MIPSPT_Entries_wellformed pt))"
 
     
+lemma MIPSPT_valid_wellformed:
+  "\<And>pt vpn. MIPSPT_valid pt \<Longrightarrow> vpn < MIPSPT_EntriesMax 
+            \<Longrightarrow> TLBENTRYLOWellFormed ((entry pt) vpn) MASK4K"
+  by(simp add:MIPSPT_valid_def MIPSPT_Entries_wellformed_def)
+  
     
 (* ========================================================================= *)  
 section "Page Table operations"
@@ -71,8 +101,19 @@ definition MIPSPT_create :: "ASID \<Rightarrow> MIPSPT"
 
 text "The newly initialized page table has all entries of the null
       entry lo"
-lemma "\<forall>vpn. (entry (MIPSPT_create as)) vpn = null_entry_lo"
-  by(auto simp:MIPSPT_create_def)  
+  
+lemma MIPSPT_create_all_null:
+  "\<forall>vpn. (entry (MIPSPT_create as)) vpn = null_entry_lo"
+  by(auto simp:MIPSPT_create_def)      
+    
+    
+text "If the ASID used to create the MIPSPT was valid, then the newly
+      created MIPSPT is valid"
+
+lemma "\<And>as. ASIDValid as \<Longrightarrow>  MIPSPT_valid (MIPSPT_create as)"    
+  by(simp add:MIPSPT_valid_def MIPSPT_Entries_wellformed_def 
+              MIPSPT_create_all_null NullEntryLoWellFormed MIPSPT_create_def)
+  
   
 
 (* ------------------------------------------------------------------------- *)   
@@ -173,6 +214,59 @@ definition MIPSPT_mk_tlbentry :: "MIPSPT \<Rightarrow> VPN \<Rightarrow> TLBENTR
 lemma "\<forall>vpn. (even (vpn2 (hi (MIPSPT_mk_tlbentry pt vpn))))"
   by(auto simp:MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
     
-    
-end  
 
+text "A created TLB Entry is always well formed."
+  
+lemma XX: 
+  assumes limit: "\<And>vpn. (vpn ::nat) < (Suc (Suc (a::nat)))"
+      and even: "\<And>vpn. even vpn"
+    shows  "\<And>vpn. vpn \<le> a"
+proof -
+  
+  from limit have X0:
+    "\<And>vpn. vpn \<le> Suc a"
+    by(auto)
+  also from even X0 have X1:
+     "\<And>vpn. vpn \<le> a"
+    by(auto)
+  
+  with X0 X1 show "\<And>vpn. vpn \<le> a"
+    by(auto)  
+qed  
+  
+  
+lemma XX2: 
+  assumes limit: "\<And>(vpn::nat) (a::nat). vpn < (Suc (Suc a))"
+      and even: "\<And>vpn. even vpn"
+    shows  "\<And>(vpn::nat) (a::nat). vpn \<le> a"
+proof -
+  
+  from limit have X0:
+    "\<And>(vpn::nat) (a::nat). vpn \<le> Suc a"
+    by(auto)
+  also from even X0 have X1:
+     "\<And>(vpn::nat) (a::nat). vpn \<le> a"
+    by(auto)
+  
+  with X0 X1 show "\<And>(vpn ::nat) (a::nat). vpn \<le> a"
+    by(auto)  
+qed    
+ 
+  
+    
+   
+lemma "\<And>pt vpn. MIPSPT_valid pt \<Longrightarrow> vpn < MIPSPT_EntriesMax \<Longrightarrow> TLBENTRYWellFormed (MIPSPT_mk_tlbentry pt vpn)"
+  apply(simp add:MIPSPT_mk_tlbentry_def)
+  apply(simp add:TLBENTRY.make_def)
+  apply(simp add:TLBENTRYWellFormed_def)
+  apply(simp add:MIPSPT_valid_wellformed)
+  apply(simp add:TLBENTRYHIWellFormed_def VPN2Valid_def VPNMin_def VPN2Max_def MB_def)
+  apply(simp add:MIPSPT_valid_def)
+  apply(simp add:MIPSPT_EntriesMax_def)
+  apply(simp add:MIPSPT_valid_def[symmetric])
+  
+  apply(auto)
+  
+  
+  oops
+   

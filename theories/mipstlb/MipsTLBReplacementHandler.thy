@@ -37,11 +37,13 @@ begin
 section "MIPS TLB + MIPS PageTables"
 (* ========================================================================= *)    
   
-text "We now define the combination of a MIPS TLB and a MIPS PageTable."  
+text "We now define the combination of a MIPS TLB and a MIPS PageTable. Note
+      that the MIPSPT stores the ASID."
   
 record MipsTLBPT = 
   tlb :: MIPSTLB
   pte :: MIPSPT
+
   
   
 (* ========================================================================= *)  
@@ -49,12 +51,29 @@ section "Exception Handler"
 (* ========================================================================= *)
   
 text "The MIPS TLB exception handler randomly replaces an entry of the TLB with 
-      the contents of the page table. "  
+      the contents of the page table. We use the random replacement operation
+      of the TLB for this purpose and return a set of MipsTLBPT."  
                                    
 definition MipsTLBPT_handle_exn :: "MipsTLBPT \<Rightarrow> nat \<Rightarrow> MipsTLBPT set"
-  where "MipsTLBPT_handle_exn mpt vpn = {\<lparr>tlb = t, pte = (pte mpt)\<rparr> | 
-                                       t. t\<in> tlbwr (MIPSPT_mk_tlbentry (pte mpt) vpn) (tlb mpt)}"
+  where "MipsTLBPT_handle_exn mpt vpn = 
+          {\<lparr>tlb = t, pte = (pte mpt)\<rparr> | 
+            t. t\<in> tlbwr (MIPSPT_mk_tlbentry (pte mpt) vpn) (tlb mpt)}"
 
+text "We can formulate a deterministic replacement policy where we always
+      replace the entry based on its VPN2 modulo the TLB capacity."
+
+(*
+    
+definition MipsTLBPT_handle_exn_det :: "MipsTLBPT \<Rightarrow> nat \<Rightarrow> MipsTLBPT set"
+  where "MipsTLBPT_handle_exn_det mpt vpn = 
+         { \<lparr>tlb = t, pte = (pte mpt)\<rparr> | 
+            t. t\<in> tlbwi ((vpn2 (hi (MIPSPT_mk_tlbentry (pte mpt) vpn))) mod TLBCapacity) (MIPSPT_mk_tlbentry (pte mpt) vpn) (tlb mpt)}"    
+
+lemma "\<And>mpt vpn. MipsTLBPT_handle_exn_det mpt vpn = { 
+      \<lparr>tlb = (\<lparr>wired = wired (tlb mpt), entries = (entries (tlb mpt))((vpn2 (hi (MIPSPT_mk_tlbentry (pte mpt) vpn)) mod TLBCapacity) := (MIPSPT_mk_tlbentry (pte mpt) vpn))\<rparr>),
+       pte = (pte mpt)\<rparr> }"
+  by(simp add:MipsTLBPT_handle_exn_det_def tlbwi_def TLBCapacity_def)
+  
 
 (* ========================================================================= *)  
 section "Translate Function"
