@@ -43,8 +43,33 @@ text "We now define the combination of a MIPS TLB and a MIPS PageTable. Note
 record MipsTLBPT = 
   tlb :: MIPSTLB
   pte :: MIPSPT
+  
+text "We say that the combination is valid, if both the TLB and the page table
+     are valid. In addition, the TLB is an instance of the page table if there
+     is a corresponding entry in the page table for all entries in the TLB with
+     a matching ASID."  
+  
+
+definition MipsTLBPT_EntryMatch :: "TLBENTRY \<Rightarrow> MIPSPT \<Rightarrow> bool"
+  where "MipsTLBPT_EntryMatch e pt = ((lo0 e) = (entry pt) (vpn2 (hi e)) 
+                                     \<and> (lo1 e) = (entry pt) (vpn2 (hi e) + 1))"
 
   
+definition MipsTLBPT_is_instance :: "MipsTLBPT \<Rightarrow> bool"
+  where "MipsTLBPT_is_instance mt = (\<forall>i<TLBCapacity. 
+      (\<not>(EntryASIDMatchA (asid (pte mt)) ((entries (tlb mt)) i)) ) 
+      \<or> (MipsTLBPT_EntryMatch (entries (tlb mt) i) (pte mt)))"  
+  
+definition MipsTLBPT_valid :: "MipsTLBPT \<Rightarrow> bool"
+  where "MipsTLBPT_valid mt = ((MIPSPT_valid (pte mt)) \<and> (TLBValid (tlb mt)) 
+                              \<and> (MipsTLBPT_is_instance mt) )"
+
+definition MipsTLBPT_valid2 :: "MipsTLBPT \<Rightarrow> bool"
+  where "MipsTLBPT_valid2 mpt = (\<forall>vpn. MIPSTLB_translate (tlb mpt) vpn  (asid (pte mpt)) \<subseteq>
+                                      MIPSPT_translate (pte mpt) vpn)"
+
+
+    
   
 (* ========================================================================= *)  
 section "Exception Handler"
@@ -62,18 +87,41 @@ definition MipsTLBPT_handle_exn :: "MipsTLBPT \<Rightarrow> nat \<Rightarrow> Mi
 text "We can formulate a deterministic replacement policy where we always
       replace the entry based on its VPN2 modulo the TLB capacity."
 
-(*
-    
-definition MipsTLBPT_handle_exn_det :: "MipsTLBPT \<Rightarrow> nat \<Rightarrow> MipsTLBPT set"
-  where "MipsTLBPT_handle_exn_det mpt vpn = 
-         { \<lparr>tlb = t, pte = (pte mpt)\<rparr> | 
-            t. t\<in> tlbwi ((vpn2 (hi (MIPSPT_mk_tlbentry (pte mpt) vpn))) mod TLBCapacity) (MIPSPT_mk_tlbentry (pte mpt) vpn) (tlb mpt)}"    
 
-lemma "\<And>mpt vpn. MipsTLBPT_handle_exn_det mpt vpn = { 
-      \<lparr>tlb = (\<lparr>wired = wired (tlb mpt), entries = (entries (tlb mpt))((vpn2 (hi (MIPSPT_mk_tlbentry (pte mpt) vpn)) mod TLBCapacity) := (MIPSPT_mk_tlbentry (pte mpt) vpn))\<rparr>),
-       pte = (pte mpt)\<rparr> }"
-  by(simp add:MipsTLBPT_handle_exn_det_def tlbwi_def TLBCapacity_def)
+definition MIPSTLBIndex :: "TLBENTRY \<Rightarrow> nat"
+  where "MIPSTLBIndex e = ((vpn2 (hi (e))) mod TLBCapacity)"
+
+    
+definition MipsTLBPT_handle_exn_det :: "MipsTLBPT \<Rightarrow> nat \<Rightarrow> MipsTLBPT"
+  where "MipsTLBPT_handle_exn_det mpt vpn = 
+         \<lparr>tlb = (\<lparr> wired = (wired (tlb mpt)), 
+                  entries = (entries (tlb mpt))((MIPSTLBIndex (MIPSPT_mk_tlbentry (pte mpt) vpn) ) :=  MIPSPT_mk_tlbentry (pte mpt) vpn) \<rparr> ), 
+         pte = (pte mpt)\<rparr>"  
+
+lemma assumes ptvalid: "\<And>mpt. MIPSPT_valid (pte mpt)"   
+         and  tlbvalid: "\<And>mpt. TLBValid (tlb mpt)"
+         and notin: "\<And>mpt vpn .MIPSTLB_translate (tlb mpt) vpn (asid (pte mpt)) = {}"
+         and inrange: "\<And>vpn. vpn < MIPSPT_EntriesMax"
+         shows "\<And>mpt vpn. TLBValid (tlb (MipsTLBPT_handle_exn_det mpt vpn))"
+ oops
+    
+(* ========================================================================= *)  
+section "Fault Function"
+(* ========================================================================= *)                                     
+
+text ""  
   
+definition MipsTLBPT_fault :: "MipsTLBPT \<Rightarrow> VPN \<Rightarrow> MipsTLBPT"
+  where "MipsTLBPT_fault  mtlb vpn = 
+      (if MIPSTLB_translate (tlb mtlb) vpn (asid (pte mtlb)) = {} then 
+          MipsTLBPT_handle_exn_det mtlb vpn
+      else mtlb)"  
+  
+
+
+
+    
+    
 
 (* ========================================================================= *)  
 section "Translate Function"
@@ -89,9 +137,6 @@ definition MipsTLBPT_translate :: "MipsTLBPT \<Rightarrow> VPN \<Rightarrow> PFN
        else MIPSTLB_translate (tlb mtlb) vpn  (asid (pte mtlb)))"
   
     
-definition MipsTLBPT_valid :: "MipsTLBPT \<Rightarrow> bool"
-  where "MipsTLBPT_valid mpt = (\<forall>vpn. MIPSTLB_translate (tlb mpt) vpn  (asid (pte mpt)) \<subseteq>
-                                      MIPSPT_translate (pte mpt) vpn)"
 
 
 
