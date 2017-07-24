@@ -206,33 +206,42 @@ lemma "\<And>pt. MIPSPT_valid pt \<Longrightarrow> (TLBENTRYLOWellFormed e MASK4
 section "VPN to PFN translation"
 (* ========================================================================= *)  
 
-text "The translate function converts a VPN into a set of PFN it translates to."  
+text "The translate function converts a VPN into a set of PFN it translates to.
+      This translation is only valid if the VPN is in the set of valid entries."  
   
 definition MIPSPT_translate :: "MIPSPT \<Rightarrow> VPN \<Rightarrow> PFN set"  
-  where "MIPSPT_translate pt vpn =  (if (v (MIPSPT_read  vpn pt)) then
+  where "MIPSPT_translate pt vpn = (if vpn < MIPSPT_EntriesMax then
+                                    (if (v (MIPSPT_read  vpn pt)) then
                                        {(pfn (MIPSPT_read vpn pt))} 
-                                       else {}) "  
-
+                                     else {}) 
+                                    else UNIV )"  
     
 text "The translate function will always return an empty or a singleton
       set of a particular vpn"    
 
-lemma "MIPSPT_translate (MIPSPT_write vpn e pt) vpn \<subseteq> {(pfn e)}"
+lemma "vpn < MIPSPT_EntriesMax \<Longrightarrow> 
+       MIPSPT_translate (MIPSPT_write vpn e pt) vpn \<subseteq> {(pfn e)}"
   by(auto simp add: MIPSPT_translate_def MIPSPT_write_def MIPSPT_read_def)
 
+text "Any attempt to translate a VPN higher than the maximum number of 
+      entries results in undefined."
+  
+lemma "\<forall>vpn \<ge> MIPSPT_EntriesMax.  MIPSPT_translate pt vpn = UNIV"
+  by(auto simp add: MIPSPT_translate_def MIPSPT_write_def MIPSPT_read_def)
+  
     
 text "The translate function of a newly created or cleared page table is empty
       for all vpn"
   
-lemma "\<forall>vpn. MIPSPT_translate (MIPSPT_create as) vpn = {}"
+lemma "\<forall>vpn < MIPSPT_EntriesMax. MIPSPT_translate (MIPSPT_create as) vpn = {}"
   by(auto simp:MIPSPT_create_def MIPSPT_translate_def
                MIPSPT_read_def null_entry_lo_def)      
 
-lemma "\<forall>vpn. MIPSPT_translate (MIPSPT_clearall pt) vpn = {}"
+lemma "\<forall>vpn < MIPSPT_EntriesMax. MIPSPT_translate (MIPSPT_clearall pt) vpn = {}"
   by(auto simp:MIPSPT_clearall_def MIPSPT_translate_def
                MIPSPT_read_def null_entry_lo_def)      
     
-lemma "\<forall>vpn. MIPSPT_translate (MIPSPT_clear vpn pt) vpn = {}"
+lemma "\<forall>vpn < MIPSPT_EntriesMax. MIPSPT_translate (MIPSPT_clear vpn pt) vpn = {}"
   by(auto simp: MIPSPT_translate_def MIPSPT_clear_def MIPSPT_write_def MIPSPT_read_def 
                 null_entry_lo_def)
 
