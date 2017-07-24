@@ -54,8 +54,15 @@ text "The MIPS PageTable has 256M x 4kB entries to fill the entire 1TB virtual
 definition MIPSPT_EntriesMax :: nat
   where "MIPSPT_EntriesMax = 268435456"   
   
+    
+text "The maximum  number of entries must match the definitions from the MIPS 
+      TLB."    
+    
 lemma "MIPSPT_EntriesMax * 4096 = GB 1024"
   by(auto simp:MIPSPT_EntriesMax_def GB_def)
+    
+lemma "MIPSPT_EntriesMax = page_count MASK4K"
+  by(auto simp:MIPSPT_EntriesMax_def page_count_def MB_def)
   
     
 (* ------------------------------------------------------------------------- *)   
@@ -142,6 +149,7 @@ text "Writes an entry in the MIPS Page Table"
 definition MIPSPT_write :: "VPN \<Rightarrow> TLBENTRYLO \<Rightarrow> MIPSPT \<Rightarrow> MIPSPT"
   where "MIPSPT_write vpn e pt =  \<lparr> entry = (entry pt)(vpn := e), asid=(asid pt)\<rparr>"
 
+    
 text "An entry can be cleared, by writing it with the Null entry"
     
 definition MIPSPT_clear :: "VPN \<Rightarrow> MIPSPT \<Rightarrow> MIPSPT"
@@ -152,19 +160,48 @@ definition MIPSPT_clearall :: "MIPSPT \<Rightarrow> MIPSPT"
     
 
 text "An entry that is written to, is read back after wards"
+
 lemma "\<And>vpn e. MIPSPT_read vpn (MIPSPT_write vpn e pt) = e"
   by(auto simp:MIPSPT_read_def MIPSPT_write_def)
 
+    
 text "An entry that is cleared reads as null entry"    
+
 lemma "\<And>vpn e. MIPSPT_read vpn (MIPSPT_clear vpn pt) = null_entry_lo"
   by(auto simp:MIPSPT_read_def MIPSPT_clear_def MIPSPT_write_def)
+
     
-text "clearing a page tabel is equvalent to crate a new page table with the same
-      ASID."    
+text "clearing a page tabel is equvalent to crate a new page table with the 
+      same ASID."    
+
 lemma "\<And>pt. MIPSPT_clearall pt = MIPSPT_create (asid pt)"
   by(auto simp:MIPSPT_create_def MIPSPT_clearall_def) 
     
+    
+text "If the MIPSPT was valid, then clearing an entry will result in a valid
+      MISPT again."
+lemma "\<And>pt vpn. MIPSPT_valid pt \<Longrightarrow> MIPSPT_valid (MIPSPT_clear vpn pt)"        
+  by(auto simp:MIPSPT_clear_def MIPSPT_write_def MIPSPT_valid_def 
+               MIPSPT_Entries_wellformed_def NullEntryLoWellFormed)
 
+             
+text "If the MIPSPT was valid, then clearing all entry will result in a valid
+      MISPT again."
+  
+lemma "\<And>pt. MIPSPT_valid pt \<Longrightarrow> MIPSPT_valid (MIPSPT_clearall pt)"    
+  by(auto simp:MIPSPT_clearall_def MIPSPT_valid_def MIPSPT_Entries_wellformed_def
+               NullEntryLoWellFormed)
+  
+             
+text "If the MIPSPT was valid and the new entry is well formed, then the
+      resulting MIPSPT will be valid too."
+  
+lemma "\<And>pt. MIPSPT_valid pt \<Longrightarrow> (TLBENTRYLOWellFormed e MASK4K)
+             \<Longrightarrow> MIPSPT_valid (MIPSPT_write vpn e pt)"    
+  by(auto simp: MIPSPT_write_def MIPSPT_valid_def MIPSPT_Entries_wellformed_def)
+    
+    
+             
 (* ========================================================================= *)  
 section "VPN to PFN translation"
 (* ========================================================================= *)  
@@ -176,6 +213,7 @@ definition MIPSPT_translate :: "MIPSPT \<Rightarrow> VPN \<Rightarrow> PFN set"
                                        {(pfn (MIPSPT_read vpn pt))} 
                                        else {}) "  
 
+    
 text "The translate function will always return an empty or a singleton
       set of a particular vpn"    
 
@@ -198,10 +236,13 @@ lemma "\<forall>vpn. MIPSPT_translate (MIPSPT_clear vpn pt) vpn = {}"
   by(auto simp: MIPSPT_translate_def MIPSPT_clear_def MIPSPT_write_def MIPSPT_read_def 
                 null_entry_lo_def)
 
+              
 (* ========================================================================= *)  
 section "Creating of a TLB Entry"
 (* ========================================================================= *)               
 
+text "For a particular VPN we can create the MIPSTLB entry pair as follows:"  
+  
 definition MIPSPT_mk_tlbentry :: "MIPSPT \<Rightarrow> VPN \<Rightarrow> TLBENTRY"
   where "MIPSPT_mk_tlbentry pt vpn = 
       (if (even vpn) then
@@ -211,62 +252,76 @@ definition MIPSPT_mk_tlbentry :: "MIPSPT \<Rightarrow> VPN \<Rightarrow> TLBENTR
            TLBENTRY.make MASK4K  \<lparr> vpn2=(vpn-1), asid=(asid pt) \<rparr> 
                          ((entry pt) (vpn - 1)) ((entry pt) vpn))"
 
+
+text "The created entrypair will always have an even VPN."    
+  
 lemma "\<forall>vpn. (even (vpn2 (hi (MIPSPT_mk_tlbentry pt vpn))))"
   by(auto simp:MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
+  
+    
+text "The EntryHi part of the created entry is always well formed. 
+      We first define a helper lemma that shows the bounds on the VPN. "
+  
+lemma VPNEvenBounds: 
+  assumes limit: "vpn < (Suc (Suc a))"
+      and even: " even vpn"
+      and aeven : "even a"
+    shows  "vpn \<le> a"
+  proof -
+    from limit have X0:
+      "vpn \<le> Suc a"
+      by(auto)
+    also from even aeven have X2:
+      "vpn \<noteq> Suc a"
+      by(auto)
+    also from even X0 X2 have X1:
+      "vpn < (Suc a)"
+      by(auto)
+    with X1 show ?thesis by(auto)
+  qed    
+  
+lemma VPNWithinValidBounds: 
+  assumes bound: "vpn < MIPSPT_EntriesMax"
+       and even: "even vpn "
+       shows "(Suc vpn) < MIPSPT_EntriesMax"
+proof -
+  have aeven: "even MIPSPT_EntriesMax" by(simp add:MIPSPT_EntriesMax_def)
+  with bound even aeven have X0: "vpn \<le> MIPSPT_EntriesMax - 2"
+    by(simp add:VPNEvenBounds)
+
+  from X0 have X1: "(Suc vpn) \<le> (MIPSPT_EntriesMax - 1)" 
+    by(auto simp:MIPSPT_EntriesMax_def)
+  with X1 show ?thesis by(auto)
+  qed    
     
 
-text "A created TLB Entry is always well formed."
-  
-lemma XX: 
-  assumes limit: "\<And>vpn. (vpn ::nat) < (Suc (Suc (a::nat)))"
-      and even: "\<And>vpn. even vpn"
-    shows  "\<And>vpn. vpn \<le> a"
-proof -
-  
-  from limit have X0:
-    "\<And>vpn. vpn \<le> Suc a"
-    by(auto)
-  also from even X0 have X1:
-     "\<And>vpn. vpn \<le> a"
-    by(auto)
-  
-  with X0 X1 show "\<And>vpn. vpn \<le> a"
-    by(auto)  
-qed  
-  
-  
-lemma XX2: 
-  assumes limit: "\<And>(vpn::nat) (a::nat). vpn < (Suc (Suc a))"
-      and even: "\<And>vpn. even vpn"
-    shows  "\<And>(vpn::nat) (a::nat). vpn \<le> a"
-proof -
-  
-  from limit have X0:
-    "\<And>(vpn::nat) (a::nat). vpn \<le> Suc a"
-    by(auto)
-  also from even X0 have X1:
-     "\<And>(vpn::nat) (a::nat). vpn \<le> a"
-    by(auto)
-  
-  with X0 X1 show "\<And>(vpn ::nat) (a::nat). vpn \<le> a"
-    by(auto)  
-qed    
- 
-  
+text "We show that all the created TLBEntries have a valid Hi part."    
     
-   
-lemma "\<And>pt vpn. MIPSPT_valid pt \<Longrightarrow> vpn < MIPSPT_EntriesMax \<Longrightarrow> TLBENTRYWellFormed (MIPSPT_mk_tlbentry pt vpn)"
-  apply(simp add:MIPSPT_mk_tlbentry_def)
-  apply(simp add:TLBENTRY.make_def)
+lemma MIPSPT_ENTRYHIWellformed:
+  "\<And>pt vpn. vpn < MIPSPT_EntriesMax \<Longrightarrow> MIPSPT_valid pt \<Longrightarrow> 
+                 TLBENTRYHIWellFormed (hi (MIPSPT_mk_tlbentry pt vpn)) MASK4K"
+  by(auto simp:MIPSPT_mk_tlbentry_def TLBENTRYHIWellFormed_def TLBENTRY.make_def 
+               MIPSPT_valid_def VPN2Valid_def VPNMin_def VPN2Max_def MB_def 
+               MIPSPT_EntriesMax_def VPNEvenBounds)
+
+text "Currently  all the entries have a page size of 4k"             
+  
+lemma MIPSPT_EntryMask_is:
+  "(mask (MIPSPT_mk_tlbentry pt vpn)) = MASK4K"
+  by(auto simp:MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
+             
+
+text "Next we show that the created entry is always well formed with respect to
+      the TLB spec."
+     
+lemma MIPSPT_TLBENTRYWellFormed:
+   "\<And>pt vpn. MIPSPT_valid pt \<Longrightarrow> vpn < MIPSPT_EntriesMax \<Longrightarrow> 
+                TLBENTRYWellFormed (MIPSPT_mk_tlbentry pt vpn)"
   apply(simp add:TLBENTRYWellFormed_def)
-  apply(simp add:MIPSPT_valid_wellformed)
-  apply(simp add:TLBENTRYHIWellFormed_def VPN2Valid_def VPNMin_def VPN2Max_def MB_def)
-  apply(simp add:MIPSPT_valid_def)
-  apply(simp add:MIPSPT_EntriesMax_def)
-  apply(simp add:MIPSPT_valid_def[symmetric])
-  
-  apply(auto)
-  
-  
-  oops
+  apply(simp add:MIPSPT_ENTRYHIWellformed MIPSPT_EntryMask_is)
+  apply(auto simp:TLBENTRYWellFormed_def MIPSPT_ENTRYHIWellformed MIPSPT_EntryMask_is 
+                  MIPSPT_mk_tlbentry_def TLBENTRY.make_def MIPSPT_valid_wellformed 
+                  VPNWithinValidBounds)
+  done
    
+end
