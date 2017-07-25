@@ -65,8 +65,9 @@ definition MipsTLBPT_valid :: "MipsTLBPT \<Rightarrow> bool"
                               \<and> (MipsTLBPT_is_instance mt) )"
 
 definition MipsTLBPT_valid2 :: "MipsTLBPT \<Rightarrow> bool"
-  where "MipsTLBPT_valid2 mpt = (\<forall>vpn. MIPSTLB_translate (tlb mpt) vpn  (asid (pte mpt)) \<subseteq>
-                                      MIPSPT_translate (pte mpt) vpn)"
+  where "MipsTLBPT_valid2 mpt = 
+      (\<forall>vpn. MIPSTLB_translate (tlb mpt) vpn  (asid (pte mpt))
+                 \<subseteq>  MIPSPT_translate (pte mpt) vpn)"
 
 
     
@@ -75,28 +76,53 @@ definition MipsTLBPT_valid2 :: "MipsTLBPT \<Rightarrow> bool"
 section "Exception Handler"
 (* ========================================================================= *)
   
-text "The MIPS TLB exception handler randomly replaces an entry of the TLB with 
-      the contents of the page table. We use the random replacement operation
-      of the TLB for this purpose and return a set of MipsTLBPT."  
+text "The MIPS TLB exception handler replaces an entry of the TLB with 
+      the contents of the page table. We provide two different implementations"  
                                    
-definition MipsTLBPT_handle_exn :: "MipsTLBPT \<Rightarrow> nat \<Rightarrow> MipsTLBPT set"
-  where "MipsTLBPT_handle_exn mpt vpn = 
-          {\<lparr>tlb = t, pte = (pte mpt)\<rparr> | 
-            t. t\<in> tlbwr (MIPSPT_mk_tlbentry (pte mpt) vpn) (tlb mpt)}"
+(* ------------------------------------------------------------------------- *)   
+subsection "Deterministic Exception Handler"  
+(* ------------------------------------------------------------------------- *)    
 
 text "We can formulate a deterministic replacement policy where we always
       replace the entry based on its VPN2 modulo the TLB capacity."
 
-
 definition MIPSTLBIndex :: "TLBENTRY \<Rightarrow> nat"
   where "MIPSTLBIndex e = ((vpn2 (hi (e))) mod TLBCapacity)"
+
+lemma MIPSTLBIndex_in_range:
+  "\<forall>e. MIPSTLBIndex e <  TLBCapacity"
+  by(auto simp:MIPSTLBIndex_def TLBCapacity_def)
 
     
 definition MipsTLBPT_handle_exn_det :: "MipsTLBPT \<Rightarrow> nat \<Rightarrow> MipsTLBPT"
   where "MipsTLBPT_handle_exn_det mpt vpn = 
          \<lparr>tlb = (\<lparr> wired = (wired (tlb mpt)), 
-                  entries = (entries (tlb mpt))((MIPSTLBIndex (MIPSPT_mk_tlbentry (pte mpt) vpn) ) :=  MIPSPT_mk_tlbentry (pte mpt) vpn) \<rparr> ), 
-         pte = (pte mpt)\<rparr>"  
+                  entries = (entries (tlb mpt))(
+                    (MIPSTLBIndex (MIPSPT_mk_tlbentry (pte mpt) vpn) )
+                       :=  MIPSPT_mk_tlbentry (pte mpt) vpn) \<rparr> ), 
+         pte = (pte mpt)\<rparr>"    
+
+text "we show that the definition produces the same result as when using the 
+      tlbwi function"
+  
+lemma "{\<lparr>tlb = t, pte = (pte mpt)\<rparr> | 
+            t. t\<in> tlbwi (MIPSTLBIndex (MIPSPT_mk_tlbentry (pte mpt) vpn)) 
+           (MIPSPT_mk_tlbentry (pte mpt) vpn) (tlb mpt)} = {MipsTLBPT_handle_exn_det mpt vpn}"    
+by(simp add:MipsTLBPT_handle_exn_det_def tlbwi_def MIPSTLBIndex_def TLBCapacity_def)
+
+  
+  
+(* ------------------------------------------------------------------------- *)   
+subsection "Random Exception handler"  
+(* ------------------------------------------------------------------------- *) 
+
+text "We can replace a random entry using the random write function of the "
+  
+definition MipsTLBPT_handle_exn_rdn :: "MipsTLBPT \<Rightarrow> nat \<Rightarrow> MipsTLBPT set"
+  where "MipsTLBPT_handle_exn_rdn mpt vpn = 
+          {\<lparr>tlb = t, pte = (pte mpt)\<rparr> | 
+            t. t\<in> tlbwr (MIPSPT_mk_tlbentry (pte mpt) vpn) (tlb mpt)}"
+
 
 lemma assumes ptvalid: "\<And>mpt. MIPSPT_valid (pte mpt)"   
          and  tlbvalid: "\<And>mpt. TLBValid (tlb mpt)"
@@ -119,7 +145,83 @@ definition MipsTLBPT_fault :: "MipsTLBPT \<Rightarrow> VPN \<Rightarrow> MipsTLB
   
 
 
+lemma X1: "\<And>vpn mpt. MipsTLBPT_valid mpt \<Longrightarrow> vpn < MIPSPT_EntriesMax 
+           \<Longrightarrow> MipsTLBPT_is_instance(MipsTLBPT_handle_exn_det mpt vpn)"       
+  apply(simp add:MipsTLBPT_valid_def)
+  apply(simp add:MipsTLBPT_is_instance_def)
+  apply(simp add:MipsTLBPT_handle_exn_det_def)
+  apply(simp add:MIPSTLBIndex_def TLBCapacity_def)
+  apply(simp add:MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
+  apply(simp add:MipsTLBPT_EntryMatch_def)
+  done     
 
+    
+lemma X2 :
+  assumes valid: "MipsTLBPT_valid mpt "
+    and inrange: "vpn < MIPSPT_EntriesMax"
+      shows "TLBValid(tlb (MipsTLBPT_handle_exn_det mpt vpn))"       
+proof -
+  from valid have X0: "TLBValid (tlb mpt)" 
+    by(auto simp add:MipsTLBPT_valid_def)
+  
+  also have X1: "(wired (tlb (MipsTLBPT_handle_exn_det mpt vpn))) =  (wired (tlb mpt)) "
+    by(simp add:MipsTLBPT_handle_exn_det_def)
+
+  from valid have X3: " MIPSPT_valid (pte mpt)" 
+    by(auto simp:MipsTLBPT_valid_def)
+  
+  from inrange X3 have X5: 
+      "TLBENTRYWellFormed ( MIPSPT_mk_tlbentry (pte mpt) vpn) "      
+      by(simp add:MIPSPT_TLBENTRYWellFormed)
+      
+  from inrange X3 X0 X5 have X4: "\<forall>i<TLBCapacity.
+        TLBEntryWellFormed (tlb (MipsTLBPT_handle_exn_det mpt vpn)) i"
+  proof -
+    
+    have A0:  "(\<forall>i<TLBCapacity. TLBEntryWellFormed (tlb (MipsTLBPT_handle_exn_det mpt vpn)) i) =
+          (\<forall>i<TLBCapacity. (i = (MIPSTLBIndex (MIPSPT_mk_tlbentry (pte mpt) vpn))
+                                 \<longrightarrow> TLBEntryWellFormed (tlb (MipsTLBPT_handle_exn_det mpt vpn)) i) \<and>
+                           (i \<noteq> (MIPSTLBIndex (MIPSPT_mk_tlbentry (pte mpt) vpn))
+                                 \<longrightarrow> TLBEntryWellFormed (tlb (MipsTLBPT_handle_exn_det mpt vpn)) i))"
+      by(auto)
+    have A1:  "... = (\<forall>i<TLBCapacity.
+        (i = MIPSTLBIndex (MIPSPT_mk_tlbentry (pte mpt) vpn) \<longrightarrow> TLBENTRYWellFormed (MIPSPT_mk_tlbentry (pte mpt) vpn)) \<and>
+        (i \<noteq> MIPSTLBIndex (MIPSPT_mk_tlbentry (pte mpt) vpn) \<longrightarrow> TLBENTRYWellFormed (entries (tlb mpt) i)))"
+      by(simp add:MipsTLBPT_handle_exn_det_def TLBEntryWellFormed_def)
+    
+    with inrange A1 A0 X0 X3 show ?thesis 
+      by(simp add:MIPSPT_TLBENTRYWellFormed TLBValid_def TLBEntryWellFormed_def MIPSTLBIndex_in_range)
+  qed
+      
+  from X0 X1 X4 have X2: "TLBValid (tlb (MipsTLBPT_handle_exn_det mpt vpn)) =  (\<forall>i<TLBCapacity.
+        TLBEntryConflictSet (entries (tlb (MipsTLBPT_handle_exn_det mpt vpn)) i) (tlb (MipsTLBPT_handle_exn_det mpt vpn)) \<subseteq> {i})"
+    by(simp add:TLBValid_def)
+  
+      
+  from inrange have X6: "... = X"
+    apply(simp add:TLBEntryConflictSet_def EntryMatch_def)
+    apply(auto)
+      
+  from X0 X1 X2 X3 X4 X5 X5 show ?thesis
+    oops
+  
+qed
+  
+  
+
+lemma X3: "\<And>vpn mpt. MipsTLBPT_valid mpt \<Longrightarrow> vpn < MIPSPT_EntriesMax 
+           \<Longrightarrow>  MIPSPT_valid (pte (MipsTLBPT_handle_exn_det mpt vpn))"       
+  by(simp add:MipsTLBPT_valid_def MipsTLBPT_handle_exn_det_def)
+  
+
+lemma "\<And>vpn mpt. MipsTLBPT_valid mpt \<Longrightarrow> vpn < MIPSPT_EntriesMax 
+           \<Longrightarrow> MipsTLBPT_valid(MipsTLBPT_handle_exn_det mpt vpn)"    
+  apply(subst MipsTLBPT_valid_def)
+  apply(auto simp:X1 X2 X3)
+  done
+
+
+  
     
     
 
