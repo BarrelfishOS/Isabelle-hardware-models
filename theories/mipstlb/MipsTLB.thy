@@ -1063,6 +1063,14 @@ definition EntryASIDMatch :: "TLBENTRY \<Rightarrow> TLBENTRY \<Rightarrow> bool
                                   \<or> (EntryIsGlobal e2))"
 
 
+lemma EntryASIDMatch_true :
+  "EntryASIDMatch e e = True"
+  by(simp add:EntryASIDMatch_def)    
+
+lemma EntryASIDMatch_commute :
+  "\<forall> e f. EntryASIDMatch e f = EntryASIDMatch f e"
+  by(auto simp add:EntryASIDMatch_def)    
+
 lemma  "ASIDValid a \<Longrightarrow> a \<in> ASIDValidSet"
   by(simp add: ASIDValid_def ASIDValidSet_def)
 
@@ -1099,6 +1107,17 @@ definition EntryVPNMatchV1 :: "VPN \<Rightarrow> TLBENTRY \<Rightarrow> bool"
 definition EntryVPNMatch ::  "TLBENTRY \<Rightarrow> TLBENTRY \<Rightarrow> bool"
   where "EntryVPNMatch e1 e2 = (((EntryRange e1) \<inter> (EntryRange e2)) \<noteq> {})"
 
+lemma EntryVPNMatch_commute :
+ "\<forall>e f. EntryVPNMatch e f = EntryVPNMatch f e"
+ by(simp add:EntryVPNMatch_def Int_commute)
+   
+lemma  EntryVPNMatch_true :
+  " EntryVPNMatch e e = True"
+  apply(cases "(mask e)")
+  apply(simp_all add: EntryVPNMatch_def EntryRange_def EntryMinVA_def
+                  page_size_def EntryMaxVA_def EntrySize_def KB_def MB_def)
+  apply(auto)
+  done       
     
 (* ------------------------------------------------------------------------- *)     
 subsection "Matching Entry"
@@ -1244,8 +1263,15 @@ next
     qed  
   qed              
 qed      
-      
- 
+
+
+lemma EntryMatch_true :
+  "\<forall>e. EntryMatch e e = True"
+  by(simp add:EntryMatch_def EntryVPNMatch_true EntryASIDMatch_true)
+   
+lemma EntryMatch_commute :
+  "\<forall>e f. EntryMatch e f = EntryMatch f e"
+  by(simp add:EntryMatch_def EntryVPNMatch_commute EntryASIDMatch_commute)
     
 (* ------------------------------------------------------------------------- *)   
 subsection "TLB Entry Ranges"
