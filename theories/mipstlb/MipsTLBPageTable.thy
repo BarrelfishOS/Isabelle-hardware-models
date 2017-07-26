@@ -255,7 +255,9 @@ text "The created TLBEntry will always have an even VPN."
   
 lemma "\<forall>vpn. (even (vpn2 (hi (MIPSPT_mk_tlbentry pt vpn))))"
   by(auto simp:MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
-  
+
+lemma "\<forall>vpn. (TLBENTRYHI.asid (hi (MIPSPT_mk_tlbentry pt vpn))) = (asid pt)"
+  by(auto simp:MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
     
 text "The EntryHi part of the created entry is always well formed. 
       We first define a helper lemma that shows the bounds on the VPN. "
