@@ -256,7 +256,8 @@ text "The created TLBEntry will always have an even VPN."
 lemma "\<forall>vpn. (even (vpn2 (hi (MIPSPT_mk_tlbentry pt vpn))))"
   by(auto simp:MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
 
-lemma "\<forall>vpn. (TLBENTRYHI.asid (hi (MIPSPT_mk_tlbentry pt vpn))) = (asid pt)"
+lemma MIPSPT_asid_is :
+   "\<forall>vpn. (TLBENTRYHI.asid (hi (MIPSPT_mk_tlbentry pt vpn))) = (asid pt)"
   by(auto simp:MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
     
 text "The EntryHi part of the created entry is always well formed. 
@@ -322,5 +323,10 @@ lemma MIPSPT_TLBENTRYWellFormed:
   apply(simp add:MIPSPT_valid_def MIPSPT_Entries_wellformed_def)
   apply(simp add:MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
   done
-   
+
+    
+lemma MIPSPT_TLBENTRY_asidmatch:
+  "EntryASIDMatchA (MIPSPT.asid (pte mpt)) (MIPSPT_mk_tlbentry (pte mpt) vpn)"
+  by(auto simp:EntryASIDMatchA_def MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
+    
 end
