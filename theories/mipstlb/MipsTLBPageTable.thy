@@ -36,8 +36,10 @@ begin
 section "MIPS Page Table"
 (* ========================================================================= *)
     
-text "The PageTable is a partially defined function from a VPN to an EntryLo
-      and the page table is created for a particular ASID. "
+text "The PageTable is a function from a VPN to an EntryLo. The page table 
+      has an associated ASID i.e. the page table is tied to a particular
+      process with this ASID. Global entries are assumed to be present in
+      all page tables."
   
 record MIPSPT = 
   entry :: "VPN \<Rightarrow> TLBENTRYLO"
@@ -53,19 +55,22 @@ text "The MIPSPT entries are wellformed if their TLBENTRYLO is well formed. Thus
       TLBENTRYLO are wellformed too."
   
 definition MIPSPT_Entries_wellformed :: "MIPSPT \<Rightarrow> bool"
-  where "MIPSPT_Entries_wellformed pt = (\<forall>vpn. TLBENTRYLOWellFormed ((entry pt) vpn) MASK4K)"
+  where "MIPSPT_Entries_wellformed pt =
+           (\<forall>vpn. TLBENTRYLOWellFormed ((entry pt) vpn) MASK4K)"
    
 
-text "A MIPSPT is valid if all its entries are well formed and the ASID is
-      within the valid range."
+text "Consequently, the MIPSPT is valid if all its entries are well formed and 
+      the ASID is within the valid range as defined by the MIPS TLB."
   
 definition MIPSPT_valid :: "MIPSPT \<Rightarrow> bool"
   where "MIPSPT_valid pt = ((ASIDValid (asid pt)) \<and> (MIPSPT_Entries_wellformed pt))"
 
 
+text "We now proof that if the MIPS PageTable is valid, then forall possible
+      VPN, the corresponding entry is well formed."
+  
 lemma MIPSPT_valid_wellformed:
-  "\<And>pt vpn. MIPSPT_valid pt \<Longrightarrow> vpn < MIPSPT_EntriesMax 
-            \<Longrightarrow> TLBENTRYLOWellFormed ((entry pt) vpn) MASK4K"
+  "\<And>pt vpn. MIPSPT_valid pt  \<Longrightarrow> TLBENTRYLOWellFormed ((entry pt) vpn) MASK4K"
   by(simp add:MIPSPT_valid_def MIPSPT_Entries_wellformed_def)
   
     
@@ -74,19 +79,21 @@ lemma MIPSPT_valid_wellformed:
 section "Page Table operations"
 (* ========================================================================= *)   
 
-
+text "In this section we define the initialization, read and write operations
+      on the page table."
+  
+  
 (* ------------------------------------------------------------------------- *)   
 subsection "Initialization"  
 (* ------------------------------------------------------------------------- *)   
 
-text "The page table is initialized by zeroing out all entries."
+text "The page table is initialized by zeroing out all entries. "
   
 definition MIPSPT_create :: "ASID \<Rightarrow> MIPSPT"
   where "MIPSPT_create as = \<lparr> entry = (\<lambda>_. null_entry_lo), asid=as \<rparr>"
 
 
-text "The newly initialized page table has all entries of the null
-      entry lo"
+text "The newly initialized page table has all entries as null EntryLo"
   
 lemma MIPSPT_create_all_null:
   "\<forall>vpn. (entry (MIPSPT_create as)) vpn = null_entry_lo"
@@ -106,11 +113,11 @@ lemma "\<And>as. ASIDValid as \<Longrightarrow>  MIPSPT_valid (MIPSPT_create as)
 subsection "Read Page Table Entry"  
 (* ------------------------------------------------------------------------- *)     
 
-
 text "Reads the entry with a particular VPN from the page table."
   
 definition MIPSPT_read :: "VPN \<Rightarrow> MIPSPT \<Rightarrow> TLBENTRYLO"
   where "MIPSPT_read vpn pt = (entry pt) vpn"
+
     
 text "The page table reads the null entry for all entries of a newly created
       page table."
@@ -123,13 +130,14 @@ lemma "\<forall>vpn. MIPSPT_read vpn (MIPSPT_create as) = null_entry_lo"
 subsection "Write Page Table Entry"  
 (* ------------------------------------------------------------------------- *)    
 
-text "Writes an entry in the MIPS Page Table"  
+text "Writes an entry at index of the VPN  in the MIPS Page Table"  
   
 definition MIPSPT_write :: "VPN \<Rightarrow> TLBENTRYLO \<Rightarrow> MIPSPT \<Rightarrow> MIPSPT"
   where "MIPSPT_write vpn e pt =  \<lparr> entry = (entry pt)(vpn := e), asid=(asid pt)\<rparr>"
 
     
-text "An entry can be cleared, by writing it with the Null entry"
+text "An entry can be cleared, by writing it with the null EntryLo. Likewise
+      we can clear all entries of a page table."
     
 definition MIPSPT_clear :: "VPN \<Rightarrow> MIPSPT \<Rightarrow> MIPSPT"
   where "MIPSPT_clear vpn pt = (MIPSPT_write vpn null_entry_lo pt)"
@@ -146,12 +154,12 @@ lemma "\<And>vpn e. MIPSPT_read vpn (MIPSPT_write vpn e pt) = e"
     
 text "An entry that is cleared reads as null entry"    
 
-lemma "\<And>vpn e. MIPSPT_read vpn (MIPSPT_clear vpn pt) = null_entry_lo"
+lemma "\<And>vpn. MIPSPT_read vpn (MIPSPT_clear vpn pt) = null_entry_lo"
   by(auto simp:MIPSPT_read_def MIPSPT_clear_def MIPSPT_write_def)
 
     
 text "clearing a page tabel is equvalent to crate a new page table with the 
-      same ASID."    
+      same ASID."
 
 lemma "\<And>pt. MIPSPT_clearall pt = MIPSPT_create (asid pt)"
   by(auto simp:MIPSPT_create_def MIPSPT_clearall_def) 
@@ -159,6 +167,7 @@ lemma "\<And>pt. MIPSPT_clearall pt = MIPSPT_create (asid pt)"
     
 text "If the MIPSPT was valid, then clearing an entry will result in a valid
       MISPT again."
+  
 lemma "\<And>pt vpn. MIPSPT_valid pt \<Longrightarrow> MIPSPT_valid (MIPSPT_clear vpn pt)"        
   by(auto simp:MIPSPT_clear_def MIPSPT_write_def MIPSPT_valid_def 
                MIPSPT_Entries_wellformed_def NullEntryLoWellFormed)
@@ -186,7 +195,8 @@ section "VPN to PFN translation"
 (* ========================================================================= *)  
 
   
-text "The translate function converts a VPN into a set of PFN it translates to."  
+text "The translate function converts a VPN into a set of PFN it translates to.
+      If the entry is marked as not-valid then there is no translation."  
   
 definition MIPSPT_translate :: "MIPSPT \<Rightarrow> VPN \<Rightarrow> PFN set"  
   where "MIPSPT_translate pt vpn = (if (v (MIPSPT_read  vpn pt)) then
@@ -195,14 +205,21 @@ definition MIPSPT_translate :: "MIPSPT \<Rightarrow> VPN \<Rightarrow> PFN set"
     
     
 text "The translate function will always return an empty or a singleton
-      set of a particular vpn"    
+      set of a particular VPN. In particular, if the entry is valid, then
+      the singleton set is returned, otherwise the empty set."    
 
 lemma "MIPSPT_translate (MIPSPT_write vpn e pt) vpn \<subseteq> {(pfn e)}"
   by(auto simp add: MIPSPT_translate_def MIPSPT_write_def MIPSPT_read_def)
   
+lemma "\<And>e. (v e) \<Longrightarrow> MIPSPT_translate (MIPSPT_write vpn e pt) vpn = {(pfn e)}"
+  by(auto simp add: MIPSPT_translate_def MIPSPT_write_def MIPSPT_read_def)
+
+lemma "\<And>e. \<not>(v e) \<Longrightarrow> MIPSPT_translate (MIPSPT_write vpn e pt) vpn = {}"
+  by(auto simp add: MIPSPT_translate_def MIPSPT_write_def MIPSPT_read_def)    
+    
     
 text "The translate function of a newly created or cleared page table is empty
-      for all vpn"
+      for all VPN."
   
 lemma "\<forall>vpn. MIPSPT_translate (MIPSPT_create as) vpn = {}"
   by(auto simp:MIPSPT_create_def MIPSPT_translate_def
@@ -212,24 +229,33 @@ lemma "\<forall>vpn. MIPSPT_translate (MIPSPT_clearall pt) vpn = {}"
   by(auto simp:MIPSPT_clearall_def MIPSPT_translate_def
                MIPSPT_read_def null_entry_lo_def)      
     
+             
+text "The translate function of a cleared entry will be empty:"             
+  
 lemma "\<forall>vpn. MIPSPT_translate (MIPSPT_clear vpn pt) vpn = {}"
   by(auto simp: MIPSPT_translate_def MIPSPT_clear_def MIPSPT_write_def 
                 MIPSPT_read_def null_entry_lo_def)
 
-              
+
+
 (* ========================================================================= *)  
 section "Creating of a TLB Entry"
-(* ========================================================================= *)               
+(* ========================================================================= *)             
 
-text "To ensure that created MIPS TLB entries form the MIPSPT are well formed, 
-      we define the maximum number of entries to be the number of 4k pages
-      the MIPS TLB supports to span its 1TB=256M x 4k address space."
+text "From a MIPS PageTable we can create a MIPS TLB entry by converting the 
+      PageTable entries. To ensure that created MIPS TLB entries form the MIPSPT 
+      are well formed, we define the maximum number of entries to be the number 
+      of 4k pages the MIPS TLB supports to span its 1TB=256M x 4k address space.
+      This is needed as the MIPS TLB defines the range of valid VPN2"
   
 
 definition MIPSPT_EntriesMax :: nat
-  where "MIPSPT_EntriesMax = 268435456"   
+  where "MIPSPT_EntriesMax = 268435456"
   
-       
+
+text "The maximum number of entries defined above spans the 1TB VAS of the
+      MIPS TLB and hence is equal to the number of 4k pages."    
+  
 lemma "MIPSPT_EntriesMax * 4096 = GB 1024"
   by(auto simp:MIPSPT_EntriesMax_def GB_def)
     
@@ -238,30 +264,43 @@ lemma "MIPSPT_EntriesMax = page_count MASK4K"
   
   
 text "For a particular VPN we can create the MIPSTLB entry pair as follows.
-      Note, the created entry may not be well formed if the VPN is outside
-      of the valid range."
+      We need to account for the fact that the MIPS TLB has pairs of EntryLO
+      and therefore the VPN needs to be even."
   
 definition MIPSPT_mk_tlbentry :: "MIPSPT \<Rightarrow> VPN \<Rightarrow> TLBENTRY"
   where "MIPSPT_mk_tlbentry pt vpn = 
         (if (even vpn) then
-            TLBENTRY.make MASK4K  \<lparr> vpn2=vpn, asid=(asid pt) \<rparr> 
-                                  ((entry pt) vpn) ((entry pt) (vpn + 1)) 
+            TLBENTRY.make MASK4K \<lparr> vpn2=vpn, asid=(asid pt) \<rparr> 
+                          ((entry pt) vpn) ((entry pt) (vpn + 1)) 
            else  
-            TLBENTRY.make MASK4K  \<lparr> vpn2=(vpn-1), asid=(asid pt) \<rparr> 
-                                  ((entry pt) (vpn - 1)) ((entry pt) vpn))"
+            TLBENTRY.make MASK4K \<lparr> vpn2=(vpn-1), asid=(asid pt) \<rparr> 
+                          ((entry pt) (vpn - 1)) ((entry pt) vpn))"
    
     
-text "The created TLBEntry will always have an even VPN."    
+text "We proof that the created TLBEntry will always have an even VPN."    
   
 lemma "\<forall>vpn. (even (vpn2 (hi (MIPSPT_mk_tlbentry pt vpn))))"
   by(auto simp:MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
 
+
+text "The asid of the created MIPS TLB Entry is always the one from the 
+      MIPS PageTable."    
+  
 lemma MIPSPT_asid_is :
    "\<forall>vpn. (TLBENTRYHI.asid (hi (MIPSPT_mk_tlbentry pt vpn))) = (asid pt)"
   by(auto simp:MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
+
+    
+text "Likewise, the ASID match function will always evaluate to true for a
+     Entry which is crated from the very same page table."    
+    
+lemma MIPSPT_TLBENTRY_asidmatch:
+  "EntryASIDMatchA (MIPSPT.asid (pte mpt)) (MIPSPT_mk_tlbentry (pte mpt) vpn)"
+  by(auto simp:EntryASIDMatchA_def MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
+
     
 text "The EntryHi part of the created entry is always well formed. 
-      We first define a helper lemma that shows the bounds on the VPN. "
+      We first define two helper lemmas that shows the bounds on the VPN. "
   
 lemma VPNEvenBounds: 
   assumes limit: "vpn < (Suc (Suc a))"
@@ -281,6 +320,7 @@ lemma VPNEvenBounds:
     with X1 show ?thesis by(auto)
   qed    
   
+    
 lemma VPNWithinValidBounds: 
   assumes bound: "vpn < MIPSPT_EntriesMax"
        and even: "even vpn "
@@ -294,17 +334,18 @@ proof -
     by(auto simp:MIPSPT_EntriesMax_def)
   with X1 show ?thesis by(auto)
 qed    
-    
+
 
 text "We show that all the created TLBEntries have a valid Hi part."    
-    
+
 lemma MIPSPT_ENTRYHIWellformed:
   "\<And>vpn pt. MIPSPT_valid pt \<Longrightarrow> vpn < MIPSPT_EntriesMax \<Longrightarrow>
-              TLBENTRYHIWellFormed (hi (MIPSPT_mk_tlbentry pt vpn)) MASK4K"
+             TLBENTRYHIWellFormed (hi (MIPSPT_mk_tlbentry pt vpn)) MASK4K"
   by(auto simp:MIPSPT_mk_tlbentry_def TLBENTRYHIWellFormed_def TLBENTRY.make_def 
                MIPSPT_valid_def VPN2Valid_def VPNMin_def VPN2Max_def MB_def 
                MIPSPT_EntriesMax_def VPNEvenBounds)
 
+             
 text "Currently  all the entries have a page size of 4k"             
   
 lemma MIPSPT_EntryMask_is:
@@ -312,8 +353,9 @@ lemma MIPSPT_EntryMask_is:
   by(auto simp:MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
              
 
-text "Next we show that the created entry is always well formed with respect to
-      the TLB spec."
+text "Next we show that if the MIPS PageTable was in a valid state, then the 
+      created entry is always well formed with respect to the MIPS TLB 
+      specifications."
      
 lemma MIPSPT_TLBENTRYWellFormed:
    "\<And>pt vpn. MIPSPT_valid pt \<Longrightarrow> vpn < MIPSPT_EntriesMax \<Longrightarrow> 
@@ -323,10 +365,5 @@ lemma MIPSPT_TLBENTRYWellFormed:
   apply(simp add:MIPSPT_valid_def MIPSPT_Entries_wellformed_def)
   apply(simp add:MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
   done
-
-    
-lemma MIPSPT_TLBENTRY_asidmatch:
-  "EntryASIDMatchA (MIPSPT.asid (pte mpt)) (MIPSPT_mk_tlbentry (pte mpt) vpn)"
-  by(auto simp:EntryASIDMatchA_def MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
     
 end
