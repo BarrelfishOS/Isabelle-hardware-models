@@ -83,13 +83,13 @@ lemma "\<And>e f. MIPSTLBIndex t e \<noteq> MIPSTLBIndex t f \<Longrightarrow> e
     
 text "We define the deterministic exception handler as follows."
     
-definition MipsTLBPT_handle_exn_det :: "MipsTLBPT \<Rightarrow> nat \<Rightarrow> MipsTLBPT"
-  where "MipsTLBPT_handle_exn_det mpt vpn = 
+definition MipsTLBPT_handle_exn_det :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> VPN  \<Rightarrow> MipsTLBPT"
+  where "MipsTLBPT_handle_exn_det mpt as vpn = 
          \<lparr>tlb = (\<lparr> capacity = (capacity (tlb mpt)), 
                   wired = (wired (tlb mpt)), 
                   entries = (entries (tlb mpt))(
-                    (MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) )
-                       :=  MIPSPT_mk_tlbentry (pte mpt) vpn) \<rparr> ), 
+                    (MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as  vpn) )
+                       :=  MIPSPT_mk_tlbentry (pte mpt) as vpn) \<rparr> ), 
          pte = (pte mpt)\<rparr>"
 
 
@@ -98,12 +98,12 @@ text "we show that the definition produces the same result as when using the
       equivalent."
   
 lemma "(capacity  (tlb mpt)) > 0  \<Longrightarrow> {\<lparr>tlb = t, pte = (pte mpt)\<rparr> | 
-            t. t\<in> tlbwi (MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn)) 
-           (MIPSPT_mk_tlbentry (pte mpt) vpn) (tlb mpt)} = {MipsTLBPT_handle_exn_det mpt vpn}"    
+            t. t\<in> tlbwi (MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as  vpn)) 
+           (MIPSPT_mk_tlbentry (pte mpt) as vpn) (tlb mpt)} = {MipsTLBPT_handle_exn_det mpt as vpn}"    
 by(simp add:MipsTLBPT_handle_exn_det_def tlbwi_def MIPSTLBIndex_def)
 
 lemma MipsTLBPT_det_capacity :
-  "(capacity (tlb (MipsTLBPT_handle_exn_det mpt vpn))) = (capacity (tlb mpt)) "
+  "(capacity (tlb (MipsTLBPT_handle_exn_det mpt as vpn))) = (capacity (tlb mpt)) "
   by(simp add:MipsTLBPT_handle_exn_det_def)
   
 (* ------------------------------------------------------------------------- *)   
@@ -112,10 +112,10 @@ subsection "Random Exception handler"
 
 text "We can replace a random entry using the random write function of the "
   
-definition MipsTLBPT_handle_exn_rdn :: "MipsTLBPT \<Rightarrow> nat \<Rightarrow> MipsTLBPT set"
-  where "MipsTLBPT_handle_exn_rdn mpt vpn = 
+definition MipsTLBPT_handle_exn_rdn :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> MipsTLBPT set"
+  where "MipsTLBPT_handle_exn_rdn mpt as vpn = 
           {\<lparr>tlb = t, pte = (pte mpt)\<rparr> | 
-            t. t\<in> tlbwr (MIPSPT_mk_tlbentry (pte mpt) vpn) (tlb mpt)}"
+            t. t\<in> tlbwr (MIPSPT_mk_tlbentry (pte mpt) as vpn) (tlb mpt)}"
 
     
     
@@ -133,9 +133,8 @@ text "We say that the combination is valid, if both the TLB and the page table
     
 definition MipsTLBPT_is_instance :: "MipsTLBPT \<Rightarrow> bool"
   where "MipsTLBPT_is_instance mt = (\<forall>i<(capacity (tlb mt)). 
-      ((EntryASIDMatchA (asid (pte mt)) ((entries (tlb mt)) i)) ) \<longleftrightarrow>
        (((entries (tlb mt) i) = 
-            MIPSPT_mk_tlbentry (pte mt) (vpn2(hi(entries (tlb mt) i)))) \<and> 
+            MIPSPT_mk_tlbentry (pte mt) (asid (hi(entries (tlb mt) i))) (vpn2(hi(entries (tlb mt) i)))) \<and> 
        (i = MIPSTLBIndex (tlb mt) (entries (tlb mt) i))))"    
         
 
@@ -143,19 +142,10 @@ text "If the TLB is an instance of the page table then forall entries if
       the ASID matches with the the ASID of the page table, then the 
       TLB entry must be the same as if its created from the page table."  
   
-lemma  "MipsTLBPT_is_instance mt \<Longrightarrow>i < (capacity (tlb mt)) \<Longrightarrow>
-      (EntryASIDMatchA (asid (pte mt)) ((entries (tlb mt)) i)) \<Longrightarrow> 
-      (entries (tlb mt) i) = MIPSPT_mk_tlbentry (pte mt) (vpn2(hi(entries (tlb mt) i)))"
+lemma  "MipsTLBPT_is_instance mt \<Longrightarrow>i < (capacity (tlb mt)) \<Longrightarrow> 
+      (entries (tlb mt) i) = MIPSPT_mk_tlbentry (pte mt)  (asid (hi(entries (tlb mt) i))) (vpn2(hi(entries (tlb mt) i)))"
   by(simp add:MipsTLBPT_is_instance_def)
 
-    
-text "If the index function of an entry in the page table is not the same as its
-      actual index, then there must not be a match on the ASID."
-  
-lemma  "MipsTLBPT_is_instance mt \<Longrightarrow>i < (capacity (tlb mt)) \<Longrightarrow> 
-        i \<noteq> MIPSTLBIndex (tlb mt) (entries (tlb mt) i)
-        \<Longrightarrow> \<not> (EntryASIDMatchA (asid (pte mt)) ((entries (tlb mt)) i))"
-  by(simp add:MipsTLBPT_is_instance_def )  
  
   
 text "We therefore can define the validity of a MIPS TLB + PageTable combination
@@ -173,8 +163,8 @@ text "If the MIPS TLB and PageTables are valid then for all VPNs the translate
   
 (* TODO *)  
   
-lemma "\<forall>vpn. MipsTLBPT_valid mt \<Longrightarrow> MIPSTLB_translate (tlb mpt) vpn  (asid (pte mpt))
-                 \<subseteq>  MIPSPT_translate (pte mpt) vpn"
+lemma "\<forall>vpn. MipsTLBPT_valid mt \<Longrightarrow> MIPSTLB_translate (tlb mpt) as vpn
+                 \<subseteq>  MIPSPT_translate (pte mpt) as vpn"
   oops
     
 
@@ -185,10 +175,10 @@ section "Fault Function"
 
 text ""  
   
-definition MipsTLBPT_fault :: "MipsTLBPT \<Rightarrow> VPN \<Rightarrow> MipsTLBPT"
-  where "MipsTLBPT_fault  mtlb vpn = 
-      (if MIPSTLB_translate (tlb mtlb) vpn (asid (pte mtlb)) = {} then 
-          MipsTLBPT_handle_exn_det mtlb vpn
+definition MipsTLBPT_fault :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> MipsTLBPT"
+  where "MipsTLBPT_fault  mtlb as vpn = 
+      (if MIPSTLB_translate (tlb mtlb) vpn as  = {} then 
+          MipsTLBPT_handle_exn_det mtlb as vpn
       else mtlb)"      
     
 
@@ -200,9 +190,9 @@ text "The Translate function checks whether the VPN can be translated using the
       TLB, if not the exception handler is invoked and the tried again."  
        
   
-definition MipsTLBPT_translate :: "MipsTLBPT \<Rightarrow> VPN \<Rightarrow> PFN set"
-  where "MipsTLBPT_translate  mtlb vpn = 
-          MIPSTLB_translate (tlb (MipsTLBPT_fault mtlb vpn)) vpn (asid (pte mtlb)) "
+definition MipsTLBPT_translate :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> PFN set"
+  where "MipsTLBPT_translate  mtlb as vpn = 
+          MIPSTLB_translate (tlb (MipsTLBPT_fault mtlb as vpn)) as vpn "
 
 
 
@@ -215,8 +205,8 @@ text "Next we proof that if the state of the MIPSTLB and page tables is valid
       then handling an exception will always results in a valid state again."  
 
 lemma MipsTLBT_keeps_instance: 
-  "\<And>vpn mpt. MipsTLBPT_valid mpt \<Longrightarrow> vpn < MIPSPT_EntriesMax 
-           \<Longrightarrow> MipsTLBPT_is_instance(MipsTLBPT_handle_exn_det mpt vpn)"       
+  "\<And>vpn mpt as. MipsTLBPT_valid mpt \<Longrightarrow> vpn < MIPSPT_EntriesMax 
+           \<Longrightarrow> MipsTLBPT_is_instance(MipsTLBPT_handle_exn_det mpt as vpn)"       
   apply(simp add:MipsTLBPT_valid_def)
   apply(simp add:MipsTLBPT_is_instance_def)
   apply(simp add:MipsTLBPT_handle_exn_det_def MIPSTLBIndex_in_range 
@@ -229,20 +219,20 @@ lemma MipsTLBT_keeps_instance:
 lemma MipsTLBPT_not_match :
 assumes valid: "MipsTLBPT_valid mpt"    
     and inrange: "\<And>vpn. vpn < MIPSPT_EntriesMax"
-    and inoteq : "\<And>i vpn. i \<noteq>  MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn)"
+    and inoteq : "\<And>i vpn. i \<noteq>  MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn)"
     and ibound: "\<And>i. i < (capacity (tlb mt))" 
-  shows "\<And>i vpn.  EntryMatch (MIPSPT_mk_tlbentry (pte mpt) vpn) (entries (tlb mpt) i) \<Longrightarrow> False"
+  shows "\<And>i vpn.  EntryMatch (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) i) \<Longrightarrow> False"
 proof -
   from valid have inst: "MipsTLBPT_is_instance mpt"
     by(simp add:MipsTLBPT_valid_def)
   
   from  inoteq ibound inrange inst have nomatch:
-    "\<And>i.  EntryASIDMatch (MIPSPT_mk_tlbentry (pte mpt) vpn) (entries (tlb mpt) i) = False"
+    "\<And>i.  EntryASIDMatch (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) i) = False"
     by(auto simp add:EntryASIDMatch_def MipsTLBPT_is_instance_def MIPSPT_asid_is 
                      MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
   
   from  inoteq ibound inrange inst nomatch 
-    show "\<And>i vpn.  EntryMatch (MIPSPT_mk_tlbentry (pte mpt) vpn) (entries (tlb mpt) i) \<Longrightarrow> False"
+    show "\<And>i vpn.  EntryMatch (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) i) \<Longrightarrow> False"
     by(auto simp:EntryASIDMatch_def)
 qed
     
@@ -253,7 +243,8 @@ qed
 lemma MipsTLBT_keeps_TLBValid :
   assumes valid: "MipsTLBPT_valid mpt "
     and inrange: "\<And>vpn. vpn < MIPSPT_EntriesMax"
-      shows "\<And>vpn. TLBValid(tlb (MipsTLBPT_handle_exn_det mpt vpn))"       
+    and inrange2: "\<And>as. ASIDValid as"
+      shows "\<And>vpn as. TLBValid(tlb (MipsTLBPT_handle_exn_det mpt as vpn))"       
 proof -
   from valid have X0: "TLBValid (tlb mpt)" 
     by(auto simp add:MipsTLBPT_valid_def)
@@ -262,7 +253,7 @@ proof -
     by(simp add:TLBValid_def TLBEntryWellFormed_def TLBENTRYWellFormed_def TLBENTRYHIWellFormed_def 
                 VPN2Valid_def)
       
-  also have X1: "\<And>vpn. (wired (tlb (MipsTLBPT_handle_exn_det mpt vpn))) =  (wired (tlb mpt)) "
+  also have X1: "\<And>vpn as. (wired (tlb (MipsTLBPT_handle_exn_det mpt as vpn))) =  (wired (tlb mpt)) "
     by(simp add:MipsTLBPT_handle_exn_det_def)
 
   from valid have X2: "MipsTLBPT_is_instance mpt"
@@ -271,113 +262,130 @@ proof -
   from valid have X3: " MIPSPT_valid (pte mpt)" 
     by(auto simp:MipsTLBPT_valid_def)
   
-  from inrange X3 have X5: 
-      "\<And>vpn. TLBENTRYWellFormed ( MIPSPT_mk_tlbentry (pte mpt) vpn) "      
+  from inrange inrange2 X3 have X5: 
+      "\<And>vpn as. TLBENTRYWellFormed ( MIPSPT_mk_tlbentry (pte mpt) as vpn) "      
       by(simp add:MIPSPT_TLBENTRYWellFormed)
       
-  from inrange X3 X0 X5 have X4: "\<And>vpn. \<forall>i<(capacity (tlb mpt)).
-        TLBEntryWellFormed (tlb (MipsTLBPT_handle_exn_det mpt vpn)) i"
+  from inrange X3 X0 X5 have X4: "\<And>vpn as. \<forall>i<(capacity (tlb mpt)).
+        TLBEntryWellFormed (tlb (MipsTLBPT_handle_exn_det mpt as vpn)) i"
   proof -
     
-    have A0:  "\<And>vpn. (\<forall>i<(capacity (tlb mpt)).
-           TLBEntryWellFormed (tlb (MipsTLBPT_handle_exn_det mpt vpn)) i) =
+    have A0:  "\<And>vpn as. (\<forall>i<(capacity (tlb mpt)).
+           TLBEntryWellFormed (tlb (MipsTLBPT_handle_exn_det mpt as vpn)) i) =
           (\<forall>i<(capacity (tlb mpt)). 
-              (i = (MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn))
-                   \<longrightarrow> TLBEntryWellFormed (tlb (MipsTLBPT_handle_exn_det mpt vpn)) i) \<and>
-              (i \<noteq> (MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn))
-                   \<longrightarrow> TLBEntryWellFormed (tlb (MipsTLBPT_handle_exn_det mpt vpn)) i))"
+              (i = (MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn))
+                   \<longrightarrow> TLBEntryWellFormed (tlb (MipsTLBPT_handle_exn_det mpt as vpn)) i) \<and>
+              (i \<noteq> (MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn))
+                   \<longrightarrow> TLBEntryWellFormed (tlb (MipsTLBPT_handle_exn_det mpt as vpn)) i))"
       by(auto)
     
         
-    have A1:  "... = ( \<lambda>vpn. \<forall>i<(capacity (tlb mpt)).
-        (i = MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) 
-            \<longrightarrow> TLBENTRYWellFormed (MIPSPT_mk_tlbentry (pte mpt) vpn)) \<and>
-        (i \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn)
+    have A1:  "... = ( \<lambda>vpn as. \<forall>i<(capacity (tlb mpt)).
+        (i = MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn) 
+            \<longrightarrow> TLBENTRYWellFormed (MIPSPT_mk_tlbentry (pte mpt) as vpn)) \<and>
+        (i \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn)
             \<longrightarrow> TLBENTRYWellFormed (entries (tlb mpt) i)))"
       
       by(simp add:MipsTLBPT_handle_exn_det_def TLBEntryWellFormed_def)
     
-    with inrange A1 A0 X0 X3 show "\<And>vpn. \<forall>i<(capacity (tlb mpt)).
-        TLBEntryWellFormed (tlb (MipsTLBPT_handle_exn_det mpt vpn)) i"
+    with inrange A1 A0 X0 X3 show "\<And>vpn as. \<forall>i<(capacity (tlb mpt)).
+        TLBEntryWellFormed (tlb (MipsTLBPT_handle_exn_det mpt as vpn)) i"
       by(auto simp:MIPSPT_TLBENTRYWellFormed TLBValid_def TLBEntryWellFormed_def MIPSTLBIndex_in_range)
   qed
       
   from X0 X1 X4 have X6: 
-      "\<And>vpn. TLBValid (tlb (MipsTLBPT_handle_exn_det mpt vpn)) = 
+      "\<And>vpn as. TLBValid (tlb (MipsTLBPT_handle_exn_det mpt as vpn)) = 
       (\<forall>i<(capacity (tlb mpt)).
-          TLBEntryConflictSet (entries (tlb (MipsTLBPT_handle_exn_det mpt vpn)) i)
-                              (tlb (MipsTLBPT_handle_exn_det mpt vpn)) \<subseteq> {i})"
+          TLBEntryConflictSet (entries (tlb (MipsTLBPT_handle_exn_det mpt as vpn)) i)
+                              (tlb (MipsTLBPT_handle_exn_det mpt as vpn)) \<subseteq> {i})"
     by(simp add:TLBValid_def MipsTLBPT_det_capacity)
   
-  from inrange X2 have X7: "... =  (\<lambda>vpn. \<forall>i<(capacity (tlb mpt)). {ia. ia < (capacity (tlb mpt)) \<and> EntryMatch (entries (tlb (MipsTLBPT_handle_exn_det mpt vpn)) ia) (entries (tlb (MipsTLBPT_handle_exn_det mpt vpn)) i)} \<subseteq> {i})"
+  from inrange X2 have X7: "... =  (\<lambda>vpn as. \<forall>i<(capacity (tlb mpt)). 
+        {ia. ia < (capacity (tlb mpt)) \<and> 
+            EntryMatch (entries (tlb (MipsTLBPT_handle_exn_det mpt as vpn)) ia) 
+                       (entries (tlb (MipsTLBPT_handle_exn_det mpt as vpn)) i)} \<subseteq> {i})"
    by(simp add:TLBEntryConflictSet_def MipsTLBPT_det_capacity)
     
       
-  from inrange X2 have X8: "... = (\<lambda>vpn. \<forall>i. (i = MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) \<longrightarrow>
-          {ia. ia \<noteq> MIPSTLBIndex  (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) \<longrightarrow> ia < (capacity (tlb mpt)) \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) vpn) (entries (tlb mpt) ia)}
-          \<subseteq> {MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn)}) \<and>
-         (i \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) \<longrightarrow>
+  from inrange X2 have X8: "... = (\<lambda>vpn as. \<forall>i. (i = MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn) \<longrightarrow>
+          {ia. ia \<noteq> MIPSTLBIndex  (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn) 
+            \<longrightarrow> ia < (capacity (tlb mpt)) \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) ia)}
+          \<subseteq> {MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as  vpn)}) \<and>
+         (i \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt)as vpn) \<longrightarrow>
           i < (capacity (tlb mpt)) \<longrightarrow>
-          {ia. (ia = MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) \<longrightarrow> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) vpn) (entries (tlb mpt) i)) \<and>
-               (ia \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) \<longrightarrow> ia < (capacity (tlb mpt)) \<and> EntryMatch (entries (tlb mpt) i) (entries (tlb mpt) ia))}
+          {ia. (ia = MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn) 
+              \<longrightarrow> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) i)) \<and>
+               (ia \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn) 
+              \<longrightarrow> ia < (capacity (tlb mpt)) \<and> EntryMatch (entries (tlb mpt) i) (entries (tlb mpt) ia))}
           \<subseteq> {i}))"      
     by(auto simp add:MipsTLBPT_handle_exn_det_def MIPSTLBIndex_in_range EntryMatch_true EntryMatch_commute  )
             
-  from inrange valid  have X10: "... =  (\<lambda>vpn. \<forall>i. (i = MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) \<longrightarrow>
-          {ia. ia \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) \<longrightarrow> ia < (capacity (tlb mpt)) \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) vpn) (entries (tlb mpt) ia)}
-          \<subseteq> {MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn)}) \<and>
-         (i \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) \<longrightarrow>
+  from inrange valid  have X10: "... =  (\<lambda>vpn as. \<forall>i. (i = MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn)
+         \<longrightarrow>  {ia. ia \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn) 
+              \<longrightarrow> ia < (capacity (tlb mpt)) \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) ia)}
+          \<subseteq> {MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn)}) \<and>
+         (i \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn) \<longrightarrow>
           i < (capacity (tlb mpt)) \<longrightarrow>
-          {ia. ia \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) \<and>
+          {ia. ia \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn) \<and>
                 ia < (capacity (tlb mpt)) \<and> EntryMatch (entries (tlb mpt) i) (entries (tlb mpt) ia)}
           \<subseteq> {i}))"
     by(auto simp add:MipsTLBPT_not_match)
   
-    from inrange valid X0 have X11:  "... =  (\<lambda>vpn. \<forall>i. (i = MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) \<longrightarrow>
-          {ia. ia \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn)
-      \<longrightarrow> ia < (capacity (tlb mpt)) \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) vpn) (entries (tlb mpt) ia)}
-          \<subseteq> {MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn)}))"
+    from inrange valid X0 have X11:  "... =  (\<lambda>vpn as. \<forall>i. (i = MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn) \<longrightarrow>
+          {ia. ia \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn)
+      \<longrightarrow> ia < (capacity (tlb mpt)) \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) ia)}
+          \<subseteq> {MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn)}))"
       by(auto simp add:TLBValid_def TLBEntryConflictSet_def)
     
-    have X12: "... = (\<lambda>vpn. {ia. ia \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn)
-      \<longrightarrow> ia < (capacity (tlb mpt)) \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) vpn) (entries (tlb mpt) ia)}
-          \<subseteq> {MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn)})"
+    have X12: "... = (\<lambda>vpn as. {ia. ia \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn)
+      \<longrightarrow> ia < (capacity (tlb mpt)) \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) ia)}
+          \<subseteq> {MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn)})"
       by(auto)
         
     
-    have X13: "... = (\<lambda>vpn. 
-          { MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) } \<union> 
-          {ia. ia < (capacity (tlb mpt)) \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) vpn) (entries (tlb mpt) ia)}
-          \<subseteq> {MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn)})"
+    have X13: "... = (\<lambda>vpn as. 
+          { MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn) } \<union> 
+          {ia. ia < (capacity (tlb mpt)) \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) ia)}
+          \<subseteq> {MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn)})"
       by(auto)
         
-    have X14: "... =  (\<lambda>vpn. 
-          { MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) } \<union>
-           {ia. ia < (capacity (tlb mpt)) \<and>  ia \<noteq>  MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) vpn) (entries (tlb mpt) ia)} \<union>
-           {ia. ia < (capacity (tlb mpt)) \<and> ia =  MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) vpn) (entries (tlb mpt) ia)}
-          \<subseteq> {MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn)})"
+    have X14: "... =  (\<lambda>vpn as. 
+          { MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn) } \<union>
+           {ia. ia < (capacity (tlb mpt)) 
+              \<and>  ia \<noteq>  MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn)
+              \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) ia)} \<union>
+           {ia. ia < (capacity (tlb mpt)) 
+              \<and> ia =  MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn) 
+              \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) ia)}
+          \<subseteq> {MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn)})"
      by(auto)
    
-   have X15: "... =  (\<lambda>vpn. 
-     {ia. ia < (capacity (tlb mpt)) \<and> ia \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) vpn) (entries (tlb mpt) ia)} \<union>
-     {ia. ia < (capacity (tlb mpt)) \<and> ia = MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) vpn) (entries (tlb mpt) ia)}
-     \<subseteq> {MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn)})"
+   have X15: "... =  (\<lambda>vpn as. 
+     {ia. ia < (capacity (tlb mpt)) 
+        \<and> ia \<noteq> MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn) 
+        \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) ia)} \<union>
+     {ia. ia < (capacity (tlb mpt)) 
+        \<and> ia = MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn) 
+        \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) ia)}
+     \<subseteq> {MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn)})"
      by(simp)
    
-   from valid inrange have X16: "... = ( \<lambda>vpn. 
-      {ia. ia < (capacity (tlb mpt)) \<and> ia = MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn) \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) vpn) (entries (tlb mpt) ia)}
-     \<subseteq> {MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) vpn)})"
+   from valid inrange have X16: "... = ( \<lambda>vpn as. 
+      {ia. ia < (capacity (tlb mpt)) 
+          \<and> ia = MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn) 
+          \<and> EntryMatch (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) ia)}
+     \<subseteq> {MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn)})"
      by(auto simp add:MipsTLBPT_not_match )
    
-   with valid inrange alleven X0 X1 X2 X3 X4 X5 X6 X7 X8 X10 X11 X12 X13 X14 X15 X16
-    show "\<And>vpn. TLBValid(tlb (MipsTLBPT_handle_exn_det mpt vpn))"
+   with valid inrange alleven inrange2 X0 X1 X2 X3 X4 X5 X6 X7 X8 X10 X11 X12 X13 X14 X15 X16
+    show "\<And>vpn as. TLBValid(tlb (MipsTLBPT_handle_exn_det mpt as vpn))"
       by(auto)
 qed
   
   
 
-lemma MipsTLBT_keeps_ptvalid: "\<And>vpn mpt. MipsTLBPT_valid mpt \<Longrightarrow> vpn < MIPSPT_EntriesMax 
-           \<Longrightarrow>  MIPSPT_valid (pte (MipsTLBPT_handle_exn_det mpt vpn))"       
+lemma MipsTLBT_keeps_ptvalid: "\<And>vpn mpt as. MipsTLBPT_valid mpt \<Longrightarrow> vpn < MIPSPT_EntriesMax 
+           \<Longrightarrow>  MIPSPT_valid (pte (MipsTLBPT_handle_exn_det mpt as vpn))"       
   by(simp add:MipsTLBPT_valid_def MipsTLBPT_handle_exn_det_def)
   
     
@@ -385,11 +393,12 @@ lemma MipsTLBT_keeps_ptvalid: "\<And>vpn mpt. MipsTLBPT_valid mpt \<Longrightarr
 lemma 
     assumes valid: "MipsTLBPT_valid mpt "
     and inrange: "\<And>vpn. vpn < MIPSPT_EntriesMax"
-shows  "\<And>vpn.  MipsTLBPT_valid(MipsTLBPT_handle_exn_det mpt vpn)"
+    and inrange2: "\<And>as. ASIDValid as"
+shows  "\<And>vpn as.  MipsTLBPT_valid(MipsTLBPT_handle_exn_det mpt as vpn)"
   apply(subst MipsTLBPT_valid_def)
   apply(simp add:MipsTLBT_keeps_ptvalid valid inrange)
   apply(simp add:MipsTLBT_keeps_instance valid inrange)
-  apply(simp add:MipsTLBT_keeps_TLBValid valid inrange)
+  apply(simp add:MipsTLBT_keeps_TLBValid valid inrange inrange2)
   done
 
 
