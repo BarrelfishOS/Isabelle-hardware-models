@@ -63,10 +63,25 @@ text "We can formulate a deterministic replacement policy where we always
 definition MIPSTLBIndex :: "TLBENTRY \<Rightarrow> nat"
   where "MIPSTLBIndex e = ((vpn2 (hi (e))) mod TLBCapacity)"
 
+    
+text "The calculated index is always in the valid range."
+
 lemma MIPSTLBIndex_in_range:
   "\<forall>e. MIPSTLBIndex e <  TLBCapacity"
   by(auto simp:MIPSTLBIndex_def TLBCapacity_def)
+    
+    
+text "If the indexes are different this implies that the two entries are not
+     the same."
+  
+lemma "\<And>e f. MIPSTLBIndex e \<noteq> MIPSTLBIndex f \<Longrightarrow> ((vpn2 (hi e)) \<noteq> (vpn2 (hi f)))"
+  by(auto simp add:MIPSTLBIndex_def TLBCapacity_def)
 
+lemma "\<And>e f. MIPSTLBIndex e \<noteq> MIPSTLBIndex f \<Longrightarrow> e \<noteq> f"
+  by(auto simp add:MIPSTLBIndex_def TLBCapacity_def)
+    
+    
+text "We define the deterministic exception handler as follows."
     
 definition MipsTLBPT_handle_exn_det :: "MipsTLBPT \<Rightarrow> nat \<Rightarrow> MipsTLBPT"
   where "MipsTLBPT_handle_exn_det mpt vpn = 
@@ -74,10 +89,12 @@ definition MipsTLBPT_handle_exn_det :: "MipsTLBPT \<Rightarrow> nat \<Rightarrow
                   entries = (entries (tlb mpt))(
                     (MIPSTLBIndex (MIPSPT_mk_tlbentry (pte mpt) vpn) )
                        :=  MIPSPT_mk_tlbentry (pte mpt) vpn) \<rparr> ), 
-         pte = (pte mpt)\<rparr>"    
+         pte = (pte mpt)\<rparr>"
+
 
 text "we show that the definition produces the same result as when using the 
-      tlbwi function"
+      tlbwi function, and therefore we can use the simpler, direct
+      equivalent."
   
 lemma "{\<lparr>tlb = t, pte = (pte mpt)\<rparr> | 
             t. t\<in> tlbwi (MIPSTLBIndex (MIPSPT_mk_tlbentry (pte mpt) vpn)) 
@@ -97,6 +114,8 @@ definition MipsTLBPT_handle_exn_rdn :: "MipsTLBPT \<Rightarrow> nat \<Rightarrow
           {\<lparr>tlb = t, pte = (pte mpt)\<rparr> | 
             t. t\<in> tlbwr (MIPSPT_mk_tlbentry (pte mpt) vpn) (tlb mpt)}"
 
+    
+    
 (* ========================================================================= *)  
 section "Valid TLB+PageTables"
 (* ========================================================================= *) 
@@ -105,56 +124,57 @@ section "Valid TLB+PageTables"
 text "We say that the combination is valid, if both the TLB and the page table
      are valid. In addition, the TLB is an instance of the page table if there
      is a corresponding entry in the page table for all entries in the TLB with
-     a matching ASID."  
+     a matching ASID. In addition, the deterministic replacement handler
+     ensures a particular location for the entry."  
   
-
-definition MipsTLBPT_EntryMatch :: "TLBENTRY \<Rightarrow> MIPSPT \<Rightarrow> bool"
-  where "MipsTLBPT_EntryMatch e pt = ((lo0 e) = (entry pt) (vpn2 (hi e)) 
-                                     \<and> (lo1 e) = (entry pt) (vpn2 (hi e) + 1))"
-
     
 definition MipsTLBPT_is_instance :: "MipsTLBPT \<Rightarrow> bool"
   where "MipsTLBPT_is_instance mt = (\<forall>i<TLBCapacity. 
       ((EntryASIDMatchA (asid (pte mt)) ((entries (tlb mt)) i)) ) \<longleftrightarrow>
-       (((entries (tlb mt) i) = MIPSPT_mk_tlbentry (pte mt) (vpn2(hi(entries (tlb mt) i)))) \<and> 
+       (((entries (tlb mt) i) = 
+            MIPSPT_mk_tlbentry (pte mt) (vpn2(hi(entries (tlb mt) i)))) \<and> 
        (i = MIPSTLBIndex (entries (tlb mt) i))))"    
+        
 
-definition MipsTLBPT_is_instance2 :: "MipsTLBPT \<Rightarrow> bool"
-  where "MipsTLBPT_is_instance2 mt = (\<forall>i<TLBCapacity. 
-      (\<not>(EntryASIDMatchA (asid (pte mt)) ((entries (tlb mt)) i)) ) 
-      \<or> ((MipsTLBPT_EntryMatch (entries (tlb mt) i) (pte mt)) \<and> 
-         (i = MIPSTLBIndex (entries (tlb mt) i)  )))"        
-
-definition MipsTLBPT_is_instance3 :: "MipsTLBPT \<Rightarrow> bool"
-  where "MipsTLBPT_is_instance3 mt = (\<forall>i<TLBCapacity. 
-      (\<not>(EntryASIDMatchA (asid (pte mt)) ((entries (tlb mt)) i)) ) 
-      \<or> (((entries (tlb mt) i) = MIPSPT_mk_tlbentry (pte mt) (vpn2(hi(entries (tlb mt) i)))) \<and> 
-         (i = MIPSTLBIndex (entries (tlb mt) i))))"
-
+text "If the TLB is an instance of the page table then forall entries if
+      the ASID matches with the the ASID of the page table, then the 
+      TLB entry must be the same as if its created from the page table."  
   
 lemma  "MipsTLBPT_is_instance mt \<Longrightarrow>i < TLBCapacity \<Longrightarrow>
       (EntryASIDMatchA (asid (pte mt)) ((entries (tlb mt)) i)) \<Longrightarrow> 
       (entries (tlb mt) i) = MIPSPT_mk_tlbentry (pte mt) (vpn2(hi(entries (tlb mt) i)))"
   by(simp add:MipsTLBPT_is_instance_def)
 
+    
+text "If the index function of an entry in the page table is not the same as its
+      actual index, then there must not be a match on the ASID."
+  
 lemma  "MipsTLBPT_is_instance mt \<Longrightarrow>i < TLBCapacity \<Longrightarrow> i \<noteq> MIPSTLBIndex (entries (tlb mt) i)
   \<Longrightarrow> \<not> (EntryASIDMatchA (asid (pte mt)) ((entries (tlb mt)) i))"
   by(simp add:MipsTLBPT_is_instance_def )  
  
-   
+  
+text "We therefore can define the validity of a MIPS TLB + PageTable combination
+      as the page tables and the TLB are valid and the TLB is an instance of
+      the page tables."
   
 definition MipsTLBPT_valid :: "MipsTLBPT \<Rightarrow> bool"
   where "MipsTLBPT_valid mt = ((MIPSPT_valid (pte mt)) \<and> (TLBValid (tlb mt)) 
                               \<and> (MipsTLBPT_is_instance mt) )"
 
-definition MipsTLBPT_valid2 :: "MipsTLBPT \<Rightarrow> bool"
-  where "MipsTLBPT_valid2 mpt = 
-      (\<forall>vpn. MIPSTLB_translate (tlb mpt) vpn  (asid (pte mpt))
-                 \<subseteq>  MIPSPT_translate (pte mpt) vpn)"
-
-
-
+    
+text "If the MIPS TLB and PageTables are valid then for all VPNs the translate
+      set of the TLB must be a subset of equal to the translate set of the 
+      PageTable."
   
+(* TODO *)  
+  
+lemma "\<forall>vpn. MipsTLBPT_valid mt \<Longrightarrow> MIPSTLB_translate (tlb mpt) vpn  (asid (pte mpt))
+                 \<subseteq>  MIPSPT_translate (pte mpt) vpn"
+  oops
+    
+
+ 
 (* ========================================================================= *)  
 section "Fault Function"
 (* ========================================================================= *)                                     
@@ -175,13 +195,11 @@ section "Translate Function"
 text "The Translate function checks whether the VPN can be translated using the
       TLB, if not the exception handler is invoked and the tried again."  
        
+  
 definition MipsTLBPT_translate :: "MipsTLBPT \<Rightarrow> VPN \<Rightarrow> PFN set"
   where "MipsTLBPT_translate  mtlb vpn = 
-      (if MIPSTLB_translate (tlb mtlb) vpn (asid (pte mtlb)) = {} then 
-           \<Union>{ MIPSTLB_translate (tlb m) vpn  (asid (pte mtlb)) | m. m\<in> (MipsTLBPT_handle_exn mtlb vpn) }
-       else MIPSTLB_translate (tlb mtlb) vpn  (asid (pte mtlb)))"
-  
-    
+          MIPSTLB_translate (tlb (MipsTLBPT_fault mtlb vpn)) vpn (asid (pte mtlb)) "
+
 
 
   
