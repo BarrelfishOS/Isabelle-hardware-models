@@ -1869,8 +1869,17 @@ subsection "TLB Write Random"
 text "The MIPS TLB supports a random replacement."
 
 definition tlbwr :: "TLBENTRY \<Rightarrow> MIPSTLB \<Rightarrow> MIPSTLB set" where
-   "tlbwr r t = { t2  |t2  i. t2 \<in> (tlbwi i r t) \<and> i \<in> (RandomIndexRange t)}"   
+   "tlbwr e tlb = { t2  |t2  i. t2 \<in> {\<lparr> capacity = (capacity tlb),
+                                  wired = (wired tlb),  
+                                  entries = (entries tlb)(i :=  e) \<rparr>} \<and> i \<in> (RandomIndexRange tlb)}"   
 
+definition tlbwr2 :: "TLBENTRY \<Rightarrow> MIPSTLB \<Rightarrow> MIPSTLB set" where
+   "tlbwr2 r t = { t2  |t2  i. t2 \<in> (tlbwi i r t) \<and> i \<in> (RandomIndexRange t)}"      
+   
+   
+lemma MIPSTLB_randwr:
+   "tlbwr e tlb = tlbwr2 e tlb"
+  by(simp add:tlbwr_def tlbwr2_def RandomIndexRange_def tlbwi_def, auto)
          
    
 text "If the TLB is in a valid state, and the entry to be inserted does not conflict
@@ -1887,7 +1896,9 @@ lemma TLBRandomUpdateValid :
 proof -
   
   have X0: "\<And>e. (\<forall>t \<in> (tlbwr e tlb). TLBValid t) = 
-                (\<forall>i \<in> RandomIndexRange tlb. \<forall>t \<in> tlbwi i e tlb. TLBValid t )"
+                (\<forall>i \<in> RandomIndexRange tlb. \<forall>t \<in>  {\<lparr> capacity = (capacity tlb),
+                                  wired = (wired tlb),  
+                                  entries = (entries tlb)(i :=  e) \<rparr>}. TLBValid t )"
     by(simp add:tlbwr_def, auto)
     
   with nc have wr: "\<And>e idx.  TLBEntryWriteable idx e tlb"
@@ -2087,9 +2098,9 @@ definition TLBENTRY_translate_va :: "TLBENTRY \<Rightarrow> nat \<Rightarrow> na
       (if EntryIsValid1 e \<and> va \<in> EntryExtendedRange1 e then
            {EntryPA1 e + ((va mod VASize) - EntryMinVA1 e)} else {})"  
 
-definition TLBENTRY_translate :: "TLBENTRY \<Rightarrow> VPN \<Rightarrow> ASID \<Rightarrow> PFN set"
+definition TLBENTRY_translate :: "TLBENTRY \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> PFN set"
   where
-    "TLBENTRY_translate e vpn as =
+    "TLBENTRY_translate e as vpn =
       (if EntryIsValid0 e \<and> EntryMatchVPNASID0 vpn as e then 
           {(pfn (lo0 e)) + (vpn - EntryMin4KVPN e)} else {}) \<union>
       (if EntryIsValid1 e \<and> EntryMatchVPNASID1 vpn as e then
@@ -2103,8 +2114,8 @@ lemma TLBENTRY_translate_empty:
               TLBENTRY_translate_def EntryIsValid0_def EntryIsValid1_def)
     
     
-definition MIPSTLB_translate :: "MIPSTLB \<Rightarrow> VPN \<Rightarrow> ASID \<Rightarrow> PFN set"
-  where "MIPSTLB_translate tlb vpn as = {pa | i pa . 
+definition MIPSTLB_translate :: "MIPSTLB \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> PFN set"
+  where "MIPSTLB_translate tlb as vpn = {pa | i pa . 
                                                 pa \<in> TLBENTRY_translate ((entries tlb) i) vpn as 
                                                 \<and> i < (capacity tlb) }"  
 
