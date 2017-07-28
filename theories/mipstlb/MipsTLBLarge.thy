@@ -32,13 +32,13 @@ theory MipsTLBLarge
 begin
 (*>*)
 
-text ""
+text "the large TLB"
   
-
 definition MipsTLBLarge_create :: "MIPSPT \<Rightarrow> MIPSTLB"
-  where "MipsTLBLarge_create pt =  \<lparr> capacity = MIPSPT_EntriesMax, 
+  where "MipsTLBLarge_create pt =  \<lparr> capacity = MIPSPT_EntriesMax * ASIDMax, 
                                      wired    = 0, 
-                                     entries  = (\<lambda>_. null_entry) \<rparr>"   
+                                     entries  = (\<lambda>n. MIPSPT_mk_tlbentry pt (n div ASIDMax) (n mod ASIDMax)) \<rparr>"
+    
   
 
 end
