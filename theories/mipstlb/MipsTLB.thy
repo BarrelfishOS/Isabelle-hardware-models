@@ -231,23 +231,28 @@ definition ASIDMin :: nat
   where "ASIDMin = 0"
   
 definition ASIDMax :: nat
-  where "ASIDMax = 255"
-  
+  where "ASIDMax = 256"
+      
+    
 definition ASIDValid :: "nat \<Rightarrow> bool"
-  where "ASIDValid a = ((ASIDMin \<le> a) \<and> (a \<le> ASIDMax))"
+  where "ASIDValid a = ((ASIDMin \<le> a) \<and> (a < ASIDMax))"
     
 definition ASIDValidList :: "nat list"
-  where "ASIDValidList = [0..<Suc ASIDMax]"
+  where "ASIDValidList = [0..<ASIDMax]"
 
 definition ASIDValidSet :: "nat set"
-  where "ASIDValidSet = {a. ASIDMin \<le> a \<and> a \<le> ASIDMax}"    
-
+  where "ASIDValidSet = {(a::nat). ASIDMin \<le> a \<and> a < ASIDMax}"    
     
 text "ASID 0 is always valid"
   
 lemma ASID0Valid : "ASIDValid 0"
-  by(simp add:ASIDValid_def ASIDMin_def)
-  
+  by(simp add:ASIDValid_def ASIDMin_def ASIDMax_def)
+
+lemma ASIDValidSet_notempty :
+  "ASIDValidSet \<noteq> {}"
+  apply(simp add:ASIDValidSet_def ASIDMin_def ASIDMax_def)
+  apply(rule exI[where x = 0], auto)
+  done 
 
 (* ------------------------------------------------------------------------- *)     
 subsection "Offset" 
@@ -353,6 +358,10 @@ lemma NullEntryLoWellFormed :
   "TLBENTRYLOWellFormed null_entry_lo MASK4K"
   by(auto simp:TLBENTRYLOWellFormed_def null_entry_lo_def  PFN0Valid)
 
+lemma NullEntryLo_not_global :
+  "\<not>g null_entry_lo"
+  by(simp add:null_entry_lo_def)
+  
     
 (* ------------------------------------------------------------------------- *)    
 subsection "TLB Entry"
@@ -417,7 +426,8 @@ lemma NullEntryIsValid :
   "TLBENTRYWellFormed null_entry"
   by(simp add:null_entry_def TLBEntryResetWellFormed TLBEntryReset_def
               TLBENTRY.make_def TLBENTRYWellFormed_def TLBENTRYHIWellFormed_def
-              NullEntryLoWellFormed VPN2Valid_def VPNMin_def ASIDValid_def ASIDMin_def)
+              NullEntryLoWellFormed VPN2Valid_def VPNMin_def ASIDValid_def 
+              ASIDMin_def ASIDMax_def)
   
   
     
@@ -541,10 +551,12 @@ lemma entry_va_consecutive :  "EntryMinVA1 e = Suc (EntryMaxVA0 e)"
 text "The NullEntry has defined minimum and maximum VA."
 
 lemma VPN2NullEntry : "vpn2 (hi null_entry) = 0"
-  by(auto simp:null_entry_def TLBEntryReset_def TLBENTRY.make_def TLBENTRYHI.make_def)
+  by(auto simp:null_entry_def TLBEntryReset_def TLBENTRY.make_def 
+               TLBENTRYHI.make_def)
 
 lemma EntrySizeNullEntry : "EntrySize null_entry = 4096"
-  by(auto simp:EntrySize_def null_entry_def TLBEntryReset_def page_size_def TLBENTRY.make_def KB_def)  
+  by(auto simp:EntrySize_def null_entry_def TLBEntryReset_def page_size_def 
+               TLBENTRY.make_def KB_def)  
   
 lemma MinVANullEntry : "EntryMinVA null_entry = 0"
   by(auto simp:EntryMinVA_def VPN2NullEntry) 
@@ -558,7 +570,8 @@ subsection "TLB Entry ASID ranges"
 (* ------------------------------------------------------------------------- *)      
     
 definition EntryASIDRange :: "TLBENTRY \<Rightarrow> addr set"
-  where "EntryASIDRange e = (if EntryIsGlobal e then {x. ASIDMin \<le> x \<and> x \<le> ASIDMax} 
+  where "EntryASIDRange e = (if EntryIsGlobal e 
+                             then {x. ASIDMin \<le> x \<and> x < ASIDMax} 
                              else {(asid (hi e))})"
     
 (* ------------------------------------------------------------------------- *)      
@@ -591,8 +604,9 @@ text "A wellformed entry has a range with falls within the virtual address space
     
 lemma TLBENTRYWellFormedEntryRangeValid :
   "TLBENTRYWellFormed e1 \<Longrightarrow>  \<forall> x \<in> EntryRange e1. x < VASize"
-  apply(simp add: TLBENTRYWellFormed_def TLBENTRYHIWellFormed_def VPN2Valid_def VPNMin_def 
-                  VPN2Max_def page_count_def EntryRange_def EntryMinVA_def EntryMaxVA_def
+  apply(simp add: TLBENTRYWellFormed_def TLBENTRYHIWellFormed_def VPN2Valid_def
+                  VPNMin_def VPN2Max_def page_count_def EntryRange_def 
+                  EntryMinVA_def EntryMaxVA_def
                   page_size_def EntrySize_def)
   apply(cases "mask e1")
   apply(simp_all add:MB_def KB_def VASize_def)
@@ -608,15 +622,16 @@ text "The extended address is the address extended with the address space identi
       address with all the ASIDs. "
   
 definition mk_extended_range :: "nat set \<Rightarrow> nat set \<Rightarrow> nat set"
-  where "mk_extended_range A R = { (va + (VASize * asid)) | va asid. va \<in> R \<and> asid \<in> A }"
+  where "mk_extended_range A R = 
+            { (va + (VASize * asid)) | va asid. va \<in> R \<and> asid \<in> A }"
 
 (* ------------------------------------------------------------------------- *)     
 subsubsection "Singleton definitions"    
 (* ------------------------------------------------------------------------- *) 
   
   
-text "The following simplifications allow to replace the expression if either of the two
-     sets is a singleton set. "  
+text "The following simplifications allow to replace the expression if either 
+      of the two sets is a singleton set. "  
   
 lemma mk_extended_range_singleton1:
   "mk_extended_range A {r} = {(r + (VASize * a)) |a. a \<in> A}"
@@ -654,8 +669,9 @@ lemma mk_extended_range_asid_union:
   by(auto simp:mk_extended_range_def)    
 
 lemma mk_extended_rang_union: 
-  "mk_extended_range (A \<union> B) (X \<union> Y) = (mk_extended_range A X) \<union> (mk_extended_range B X) \<union> 
-                                       (mk_extended_range A Y) \<union>  (mk_extended_range B Y)"
+  "mk_extended_range (A \<union> B) (X \<union> Y) =
+        (mk_extended_range A X) \<union> (mk_extended_range B X) 
+             \<union>  (mk_extended_range A Y) \<union>  (mk_extended_range B Y)"
   by(auto simp:mk_extended_range_def)    
   
 
@@ -667,7 +683,8 @@ subsubsection "Extended Range Intersections"
 lemma mk_extended_range_addr_inter: 
  assumes spaceA:  "\<forall>a\<in>A . a < VASize" 
     and  spaceB:  "\<forall>b\<in>B . b < VASize" 
-  shows "mk_extended_range X (A \<inter> B) = (mk_extended_range X A) \<inter> (mk_extended_range X B)"
+  shows "mk_extended_range X (A \<inter> B) = 
+               (mk_extended_range X A) \<inter> (mk_extended_range X B)"
      (is "?X = ?Y")
 proof(intro antisym subsetI)
   fix x
@@ -704,7 +721,8 @@ qed
 
 lemma mk_extended_range_asid_inter:
   assumes space:  "\<forall>x \<in> X . x < VASize"
-  shows   "mk_extended_range (A \<inter> B) X = (mk_extended_range A X) \<inter> (mk_extended_range B X)"
+  shows   "mk_extended_range (A \<inter> B) X 
+                    = (mk_extended_range A X) \<inter> (mk_extended_range B X)"
     (is "?X = ?Y")
 proof(intro antisym subsetI)
   fix x
@@ -744,7 +762,8 @@ qed
 lemma mk_extended_range_inter: 
   assumes spaceC:  "\<forall>c\<in>C . c < VASize" 
       and spaceD:  "\<forall>d\<in>D . d < VASize"
-    shows "mk_extended_range (A \<inter> B) (C \<inter> D) = (mk_extended_range A C) \<inter> (mk_extended_range B D)"
+    shows "mk_extended_range (A \<inter> B) (C \<inter> D)
+                  = (mk_extended_range A C) \<inter> (mk_extended_range B D)"
       (is "?X = ?Y")
 proof(intro antisym subsetI)
   fix x
@@ -784,7 +803,8 @@ qed
 lemma mk_extended_range_inter2: 
   assumes spaceC:  "\<forall>c\<in>C . c < VASize" 
       and spaceD:  "\<forall>d\<in>D . d < VASize"
-    shows "mk_extended_range (A \<inter> B) (C \<inter> D) = (mk_extended_range B C) \<inter> (mk_extended_range A D)"
+    shows "mk_extended_range (A \<inter> B) (C \<inter> D)
+                 = (mk_extended_range B C) \<inter> (mk_extended_range A D)"
       (is "?X = ?Y")
 proof(intro antisym subsetI)
   fix x
@@ -823,7 +843,8 @@ qed
 lemma mk_extended_range_inter3: 
   assumes spaceC:  "\<forall>c\<in>C . c < VASize" 
       and spaceD:  "\<forall>d\<in>D . d < VASize"
-    shows "mk_extended_range (A \<inter> B) (C \<inter> D) = (mk_extended_range A D) \<inter> (mk_extended_range B C)"
+    shows "mk_extended_range (A \<inter> B) (C \<inter> D) 
+                 = (mk_extended_range A D) \<inter> (mk_extended_range B C)"
       (is "?X = ?Y")
 proof(intro antisym subsetI)
   fix x
@@ -992,7 +1013,8 @@ proof cases
       also from wfe2 have space2: "\<forall>x2\<in>EntryRange e2 . x2 < VASize"
         by(simp add :TLBENTRYWellFormedEntryRangeValid)
       with e1g ne2g have X0: "(EntryExtendedRange e1 \<inter> EntryExtendedRange e2) = 
-              mk_extended_range ASIDValidSet (EntryRange e1) \<inter> mk_extended_range {asid (hi e2)} (EntryRange e2)"
+              mk_extended_range ASIDValidSet (EntryRange e1) 
+                   \<inter> mk_extended_range {asid (hi e2)} (EntryRange e2)"
         by(simp add:EntryExtendedRange_def)
       with space1 space2 empty nz show ?thesis 
          by(auto simp add:mk_extended_range_empty_addr_inter2)      
@@ -1011,7 +1033,8 @@ next
       also from wfe2 have space2: "\<forall>x2\<in>EntryRange e2 . x2 < VASize"
         by(simp add :TLBENTRYWellFormedEntryRangeValid)
       with ne1g e2g have X0: "(EntryExtendedRange e1 \<inter> EntryExtendedRange e2) = 
-              mk_extended_range {asid (hi e1)} (EntryRange e1) \<inter> mk_extended_range ASIDValidSet  (EntryRange e2)"
+              mk_extended_range {asid (hi e1)} (EntryRange e1) 
+                  \<inter> mk_extended_range ASIDValidSet  (EntryRange e2)"
         by(simp add:EntryExtendedRange_def)
       with space1 space2 empty nz show ?thesis 
          by(auto simp add:mk_extended_range_empty_addr_inter2)      
@@ -1026,7 +1049,8 @@ next
       also from wfe2 have space2: "\<forall>x2\<in>EntryRange e2 . x2 < VASize"
         by(simp add :TLBENTRYWellFormedEntryRangeValid)
       with ne1g ne2g have X0: "(EntryExtendedRange e1 \<inter> EntryExtendedRange e2) = 
-              mk_extended_range {asid (hi e1)} (EntryRange e1) \<inter> mk_extended_range {asid (hi e2)}  (EntryRange e2)"
+              mk_extended_range {asid (hi e1)} (EntryRange e1)
+                   \<inter> mk_extended_range {asid (hi e2)}  (EntryRange e2)"
         by(simp add:EntryExtendedRange_def)
       with space1 space2 empty nz show ?thesis 
          by(auto simp add:mk_extended_range_empty_addr_inter2)      
@@ -1198,7 +1222,8 @@ proof cases
         by(simp add :TLBENTRYWellFormedEntryRangeValid)
       also from wfe2 have space2: "\<forall>x2\<in>EntryRange e2 . x2 < VASize"
         by(simp add :TLBENTRYWellFormedEntryRangeValid)
-      have nemtpy: "ASIDValidSet \<noteq> {}" by(auto simp add:ASIDValidSet_def ASIDMin_def ASIDMax_def)
+      have nemtpy: "ASIDValidSet \<noteq> {}" 
+        by(simp add:ASIDValidSet_notempty)
       have X0: "EntryMatch e1 e2 = (EntryRange e1 \<inter> EntryRange e2 \<noteq> {})" 
         by(simp add:EntryMatch_def EntryVPNMatch_def EntryASIDMatch_def e1g)
       have X1: "EntryMatchER e1 e2 = (mk_extended_range ASIDValidSet (EntryRange e1) \<inter> mk_extended_range ASIDValidSet (EntryRange e2) \<noteq> {})"
@@ -2083,6 +2108,59 @@ proof -
   finally show ?thesis .
 qed
 
+  
+(* ========================================================================= *)  
+section "TLB Exceptions"
+(* ========================================================================= *)   
+
+text "An attempt to translate a mapped address can result into one of four
+      states: no entry present (REFILL), entry is invalid (INVALID) those
+      won't translate the address. The address will be translated if
+      the entry is in the modified state or there is no exception."  
+  
+datatype MIPSTLBEXN = EXNREFILL | EXNINVALID | EXNMOD | EXNOK
+
+definition MIPSTLB_try_translate :: "MIPSTLB \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> MIPSTLBEXN"
+  where "MIPSTLB_try_translate tlb as vpn =    
+    (if (\<exists>i < (capacity tlb). (EntryMatchVPNASID0 vpn as ((entries tlb) i) ))
+      then (
+        (if even vpn then 
+          (if (\<exists>i < (capacity tlb). (EntryMatchVPNASID0 vpn as ((entries tlb) i) ) 
+                    \<and> EntryIsValid0 ((entries tlb) i))
+           then EXNOK
+           else EXNINVALID )
+      else 
+           (if (\<exists>i < (capacity tlb). (EntryMatchVPNASID0 vpn as ((entries tlb) i) ) 
+                    \<and> EntryIsValid1 ((entries tlb) i))
+           then EXNOK
+           else EXNINVALID )
+        )
+      )
+      else EXNREFILL)"
+
+    
+lemma "\<forall>vpn as tlb. MIPSTLB_try_translate (MIPSR4600TLBinit w tlb) as vpn \<noteq>  EXNOK"    
+  apply(simp add:MIPSTLB_try_translate_def)
+  apply(simp add:MIPSR4600TLBinit_def MIPSTLBInit_def)
+  apply(simp add:EntryIsValid0_def EntryIsValid1_def)
+  apply(simp add:TLBEntryReset_def null_entry_lo_def TLBENTRY.make_def)
+  done
+
+lemma "\<And>as . \<forall>vpn tlb. as \<noteq> 0 \<Longrightarrow>  MIPSTLB_try_translate (MIPSR4600TLBinit w tlb) as vpn =  EXNREFILL"
+  apply(simp add:MIPSTLB_try_translate_def)
+  apply(simp add:MIPSR4600TLBinit_def MIPSTLBInit_def)
+  apply(simp add:EntryIsValid0_def EntryIsValid1_def)
+  apply(simp add:TLBEntryReset_def null_entry_lo_def TLBENTRY.make_def)
+  apply(simp add:EntryMatchVPNASID0_def EntryASIDMatchA_def EntryIsGlobal_def)
+  done
+    
+  
+  
+text "The following exception will occur if a virtual address is trying to be
+      resolved, but there is no "  
+  
+definition MIPSTLB_exn_refill :: "MIPSTLB \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> bool" 
+  where "MIPSTLB_exn_refill tlb as vpn = False"
 
 (* ========================================================================= *)  
 section "Translate Function"
