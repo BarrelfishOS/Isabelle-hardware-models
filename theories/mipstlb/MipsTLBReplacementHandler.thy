@@ -28,7 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (*<*)
 theory MipsTLBReplacementHandler
-  imports MipsTLB MipsTLBPageTable MipsTLBLarge
+  imports MipsTLB MipsTLBPageTable 
 begin
 (*>*)
 
@@ -76,10 +76,12 @@ text "We say that the combination is valid, if both the TLB and the page table
     
 definition MipsTLBPT_is_instance :: "MipsTLBPT \<Rightarrow> bool"
   where "MipsTLBPT_is_instance mt = (\<forall>i <  (capacity (tlb mt)). 
-         (entry (pte mt)) (TLBENTRYHI.asid (hi (entries (tlb mt) i))) 
-                          (vpn2 (hi (entries (tlb mt) i))) = (lo0(entries (tlb mt) i)) \<and> 
-         (entry (pte mt)) (TLBENTRYHI.asid (hi (entries (tlb mt) i)))
-                          (vpn2 (hi (entries (tlb mt) i)) + 1) = (lo1(entries (tlb mt) i)))"
+        MIPSPT_read (TLBENTRYHI.asid (hi (entries (tlb mt) i))) 
+                    (vpn2 (hi (entries (tlb mt) i)))
+                    (pte mt)       = (lo0(entries (tlb mt) i)) \<and> 
+        MIPSPT_read (TLBENTRYHI.asid (hi (entries (tlb mt) i)))
+                    (vpn2 (hi (entries (tlb mt) i)) + 1) 
+                    (pte mt) = (lo1(entries (tlb mt) i)))"
 
 
   
@@ -134,7 +136,7 @@ lemma MipsTLBT_keeps_instance:
   "\<And>vpn mpt as. MipsTLBPT_valid mpt \<Longrightarrow> vpn < MIPSPT_EntriesMax 
        \<Longrightarrow> \<forall>m \<in> (MipsTLBPT_fault mpt as vpn).  MipsTLBPT_is_instance m"       
   apply(simp add:MipsTLBPT_valid_def)
-  apply(simp add:MipsTLBPT_is_instance_def)
+  apply(simp add:MipsTLBPT_is_instance_def MIPSPT_read_def)
   apply(simp add:MipsTLBPT_update_tlb_def MipsTLBPT_fault_def)
   apply(simp add:tlbwr_def RandomIndexRange_def)
   apply(simp add:MIPSPT_mk_tlbentry_def)
@@ -196,16 +198,7 @@ lemma
   apply(simp add:MipsTLBT_keeps_ptvalid valid inrange inrange2 )
   apply(simp add:MipsTLBT_keeps_instance valid inrange)
   apply(simp add:MipsTLBT_keeps_TLBValid valid inrange inrange2 )
-  
   done
 
-    
-(* ========================================================================= *)  
-section "Equivalence to Large TLB"
-(* ========================================================================= *)  
 
-text "Next we show that for all " 
-
-lemma "\<And>mpt vpn as. MipsTLBPT_translate mpt as vpn = MIPSTLB_translate (MipsTLBLarge_create (pte mpt)) as vpn"
-    
 end 

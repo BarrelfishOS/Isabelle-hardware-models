@@ -28,7 +28,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (*<*)
 theory MipsTLBReplacementHandlerDeter
-  imports MipsTLB MipsTLBPageTable MipsTLBLarge
+  imports MipsTLB MipsTLBPageTable 
 begin
 (*>*)
 
@@ -388,5 +388,6 @@ section "Equivalence to Large TLB"
 text "Next we show that for all " 
 
 lemma "\<And>mpt vpn as. MipsTLBPT_translate mpt as vpn = MIPSTLB_translate (MipsTLBLarge_create (pte mpt)) as vpn"
+  oops
     
 end 
