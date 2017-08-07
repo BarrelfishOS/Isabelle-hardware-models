@@ -170,16 +170,233 @@ section "No faults"
 (* ========================================================================= *)     
 
   
-lemma "MIPSTLB_translate (MipsTLBLarge_create pt) "  
+text "For the VPN and ASID in the valid range, there won't be any faults
+      occurring in the large TLB."
+  
+lemma MipsTLBLarge_match_exists_even:
+  assumes inrange: " vpn < MIPSPT_EntriesMax"
+      and inrange2: "ASIDValid as"
+      and valid: "MIPSPT_valid pt"
+      and evenvpn: "even vpn"
+  shows "\<exists>i<MipsTLBLarge_Entries. EntryMatchVPNASID0 vpn as (entries (MipsTLBLarge_create pt) i)"  
+proof -
+
+  obtain i
+    where idx: "i =  (as * MipsTLBLarge_EntryPairs + (vpn div 2 ))" 
+    by(auto)
+    
+  from inrange inrange2 idx have  ir2 : "i <  MipsTLBLarge_Entries"
+  proof -
+    have X0: "i < MipsTLBLarge_Entries = (i < MipsTLBLarge_EntryPairs * ASIDMax)"
+      by(simp add:MipsTLBLarge_Entries_def)
+    
+    from inrange2 have X1: "as < ASIDMax"
+      by(simp add:ASIDValid_def)
+    
+    from X1 inrange have X2:
+      "((as::nat) * MipsTLBLarge_EntryPairs + ((vpn::nat) div 2))
+            <  (MipsTLBLarge_EntryPairs * ASIDMax) "
+      by(simp add:MipsTLBLarge_EntryPairs_def MIPSPT_EntriesMax_def ASIDMax_def)
+
+    show ?thesis
+      apply(simp add:idx)
+      apply(simp add:MipsTLBLarge_Entries_def)
+      apply(simp add:X1 inrange X2)
+      done   
+  qed
+  
+  show ?thesis
+  proof (rule exI[where x = i])
+    
+    from inrange inrange2 have X0 :
+       "as * MipsTLBLarge_EntryPairs + vpn div 2 < MipsTLBLarge_Entries"
+      by(simp add:MipsTLBLarge_EntryPairs_def MipsTLBLarge_Entries_def 
+                  MIPSPT_EntriesMax_def ASIDMax_def ASIDValid_def ASIDMin_def)
+      
+    
+    have X1:  
+   "(i < MipsTLBLarge_Entries \<and> EntryMatchVPNASID0 vpn as (entries (MipsTLBLarge_create pt) i)) = 
+     ((as * MipsTLBLarge_EntryPairs + vpn div 2) < MipsTLBLarge_Entries \<and>
+             EntryMatchVPNASID0 vpn as 
+            (entries (MipsTLBLarge_create pt) (as * MipsTLBLarge_EntryPairs + vpn div 2)))"
+      by(simp add:idx)
+        
+    have X2:
+     "... = EntryMatchVPNASID0 vpn as 
+           (entries (MipsTLBLarge_create pt) (as * MipsTLBLarge_EntryPairs + vpn div 2))"
+      by(simp add:X0)
+        
+    from valid have X3: 
+     "... = (EntryVPNMatchV0 vpn (MIPSPT_mk_tlbentry pt 
+             ((as * MipsTLBLarge_EntryPairs + vpn div 2) div MipsTLBLarge_EntryPairs)
+             (vpn div 2 mod MipsTLBLarge_EntryPairs * 2)) \<and>
+                (as * MipsTLBLarge_EntryPairs + vpn div 2) div MipsTLBLarge_EntryPairs = as)"
+      apply(simp add:EntryMatchVPNASID0_def MipsTLBLarge_create_def EntryASIDMatchA_def)
+      apply(simp add:MIPSPT_valid_entries_not_global MIPSPT_asid_is)
+      done
+    
+    have X4:
+     "... = (vpn div 2 mod MipsTLBLarge_EntryPairs * 2 \<le> vpn \<and> 
+            vpn < Suc (vpn div 2 mod MipsTLBLarge_EntryPairs * 2) \<and> 
+            (as * MipsTLBLarge_EntryPairs + vpn div 2) div MipsTLBLarge_EntryPairs = as)"
+      apply(simp add:EntryVPNMatchV0_def EntryMin4KVPN_def num_4k_pages_def EntryMin4KVPN1_def)
+      apply(simp add:MIPSPT_VPN2_is MIPSPT_EntryMask_is)
+      done
+ 
+        
+    from inrange inrange2 evenvpn have X5:  "... = True"
+      by(simp add:MipsTLBLarge_EntryPairs_def MIPSPT_EntriesMax_def)
+          
+    from X0 X1 X2 X3 X4 X5
+    show " i < MipsTLBLarge_Entries \<and> EntryMatchVPNASID0 vpn as (entries (MipsTLBLarge_create pt) i)"
+      by(auto)
+  qed
+qed
+
+
+  
+lemma MipsTLBLarge_match_exists_odd:
+  assumes inrange: " vpn < MIPSPT_EntriesMax"
+      and inrange2: "ASIDValid as"
+      and valid: "MIPSPT_valid pt"
+      and oddvpn: "odd vpn"
+  shows "\<exists>i<MipsTLBLarge_Entries. EntryMatchVPNASID1 vpn as (entries (MipsTLBLarge_create pt) i)"  
+proof -
+
+  obtain i
+    where idx: "i =  (as * MipsTLBLarge_EntryPairs + ((vpn - 1) div 2 ))" 
+    by(auto)
+    
+  from inrange inrange2 idx have  ir2 : "i <  MipsTLBLarge_Entries"
+  proof -
+    have X0: "i < MipsTLBLarge_Entries = (i < MipsTLBLarge_EntryPairs * ASIDMax)"
+      by(simp add:MipsTLBLarge_Entries_def)
+    
+    from inrange2 have X1: "as < ASIDMax"
+      by(simp add:ASIDValid_def)
+    
+    from X1 inrange have X2:
+      "((as::nat) * MipsTLBLarge_EntryPairs + (((vpn::nat) - Suc 0) div 2)) 
+           <  (MipsTLBLarge_EntryPairs * ASIDMax) "
+      by(simp add:MipsTLBLarge_EntryPairs_def MIPSPT_EntriesMax_def ASIDMax_def)
+        
+    show ?thesis
+      apply(simp add:idx)
+      apply(simp add:MipsTLBLarge_Entries_def)
+      apply(simp add:X1 inrange X2)
+      done   
+  qed
+  
+  show ?thesis
+  proof (rule exI[where x = i])
+    
+    from inrange inrange2 have X0 :
+     "as * MipsTLBLarge_EntryPairs + (vpn - Suc 0) div 2 < MipsTLBLarge_Entries"
+      by(simp add:MipsTLBLarge_EntryPairs_def MipsTLBLarge_Entries_def
+                  MIPSPT_EntriesMax_def ASIDMax_def ASIDValid_def ASIDMin_def)
+      
+    
+    have X1: 
+    "(i < MipsTLBLarge_Entries \<and> EntryMatchVPNASID1 vpn as (entries (MipsTLBLarge_create pt) i)) = 
+         ((as * MipsTLBLarge_EntryPairs + (vpn -1) div 2) <  MipsTLBLarge_Entries 
+            \<and> EntryMatchVPNASID1 vpn as (entries (MipsTLBLarge_create pt) 
+                      (as * MipsTLBLarge_EntryPairs + (vpn - 1) div 2)))"
+      by(simp add:idx)
+        
+    have X2: 
+      "... = EntryMatchVPNASID1 vpn as (entries (MipsTLBLarge_create pt) 
+                  (as * MipsTLBLarge_EntryPairs + (vpn - 1) div 2))"
+      by(simp add:X0)
+        
+    from valid have X3:
+      "... = (EntryVPNMatchV1 vpn (MIPSPT_mk_tlbentry pt 
+              ((as * MipsTLBLarge_EntryPairs + (vpn - Suc 0) div 2) div MipsTLBLarge_EntryPairs) 
+              ((vpn - Suc 0) div 2 mod MipsTLBLarge_EntryPairs * 2)) \<and>
+     (as * MipsTLBLarge_EntryPairs + (vpn -1) div 2) div MipsTLBLarge_EntryPairs = as)"
+      apply(simp add:EntryMatchVPNASID1_def MipsTLBLarge_create_def EntryASIDMatchA_def)
+      apply(simp add:MIPSPT_valid_entries_not_global MIPSPT_asid_is)
+      done
+    
+    have X4: 
+    "... = (Suc ((vpn - Suc 0) div 2 mod MipsTLBLarge_EntryPairs * 2) \<le> vpn \<and>
+      vpn \<le> Suc ((vpn - Suc 0) div 2 mod MipsTLBLarge_EntryPairs * 2) \<and>
+      (as * MipsTLBLarge_EntryPairs + (vpn - Suc 0) div 2) div MipsTLBLarge_EntryPairs = as) "
+      apply(simp add:EntryVPNMatchV1_def EntryMax4KVPN_def num_4k_pages_def EntryMin4KVPN1_def)
+      apply(simp add:MIPSPT_VPN2_is MIPSPT_EntryMask_is)
+      done
+        
+    from inrange inrange2 oddvpn have X5:  "... = True"
+      by(simp add:MipsTLBLarge_EntryPairs_def MIPSPT_EntriesMax_def)
+          
+    from X0 X1 X2 X3 X4 X5
+    show " i < MipsTLBLarge_Entries \<and> EntryMatchVPNASID1 vpn as (entries (MipsTLBLarge_create pt) i)"
+      by(auto)
+  qed
+qed
+
+
   
 lemma MipsTLBLarge_no_faults:
-  assumes valid: "\<And>mpt. MipsTLBPT_valid mpt "
-    and inrange: "\<And>vpn. vpn < MIPSPT_EntriesMax"
-    and inrange2: "\<And>as. ASIDValid as"
-  shows "\<And>vpn mpt as.  \<forall>m \<in> MipsTLBPT_fault mpt as vpn .  m = mpt"
-  apply(simp add:MipsTLBPT_fault_def)
+assumes valid: "MIPSPT_valid pt"
+    and inrange: " vpn < MIPSPT_EntriesMax"
+    and inrange2: "ASIDValid as"
+  shows "MIPSTLB_try_translate (MipsTLBLarge_create pt) as vpn \<noteq> EXNREFILL"
+proof (cases)
+  assume vpneven : "even vpn"
+  show ?thesis
+  proof -
+            
+    have capacity: "capacity (MipsTLBLarge_create pt) = MipsTLBLarge_Entries"
+      by(simp add:MipsTLBLarge_create_def)    
+        
+    from vpneven capacity have X1: "MIPSTLB_try_translate (MipsTLBLarge_create pt) as vpn = 
+      ( if \<exists>i<MipsTLBLarge_Entries. EntryMatchVPNASID0 vpn as (entries (MipsTLBLarge_create pt) i)
+        then if \<exists>i<MipsTLBLarge_Entries. EntryMatchVPNASID0 vpn as (entries (MipsTLBLarge_create pt) i) 
+                  \<and> EntryIsValid0 (entries (MipsTLBLarge_create pt) i) then EXNOK
+             else EXNINVALID
+        else EXNREFILL)"
+      by(simp add:MIPSTLB_try_translate_def)
     
-
+     from inrange inrange2 valid vpneven have  X2: "... = 
+       (if \<exists>i<MipsTLBLarge_Entries. EntryMatchVPNASID0 vpn as (entries (MipsTLBLarge_create pt) i) 
+                  \<and> EntryIsValid0 (entries (MipsTLBLarge_create pt) i) then EXNOK
+             else EXNINVALID)"
+      by(auto simp:MipsTLBLarge_match_exists_even)
+    
+    have X3: "... \<noteq> EXNREFILL"
+      by(auto)
+        
+    from X1 X2 X3 show ?thesis
+      by(auto)
+         
+  qed
+next 
+  assume vpnodd: "odd vpn"
+  show ?thesis 
+  proof -
+     have capacity: "capacity (MipsTLBLarge_create pt) = MipsTLBLarge_Entries"
+       by(simp add:MipsTLBLarge_create_def)
+                   
+  from vpnodd capacity have X1: "MIPSTLB_try_translate (MipsTLBLarge_create pt) as vpn = 
+      ( if \<exists>i<MipsTLBLarge_Entries. EntryMatchVPNASID1 vpn as (entries (MipsTLBLarge_create pt) i)
+        then if \<exists>i<MipsTLBLarge_Entries. EntryMatchVPNASID1 vpn as (entries (MipsTLBLarge_create pt) i) 
+                  \<and> EntryIsValid1 (entries (MipsTLBLarge_create pt) i) then EXNOK
+             else EXNINVALID
+        else EXNREFILL)"
+      by(simp add:MIPSTLB_try_translate_def)
+                
+     from inrange inrange2 valid vpnodd have X2: "... = 
+        (if \<exists>i<MipsTLBLarge_Entries. EntryMatchVPNASID1 vpn as (entries (MipsTLBLarge_create pt) i)
+                 \<and> EntryIsValid1 (entries (MipsTLBLarge_create pt) i) then EXNOK else EXNINVALID)"
+       by(auto simp:MipsTLBLarge_match_exists_odd)    
+    
+    have X3: "... \<noteq> EXNREFILL"
+      by(auto)
+        
+    from X1 X2 X3 show ?thesis
+      by(auto)
+  qed   
+qed
 
 
     
