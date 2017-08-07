@@ -1155,8 +1155,7 @@ definition EntryVPNMatchV0 :: "VPN \<Rightarrow> TLBENTRY \<Rightarrow> bool"
 
 definition EntryVPNMatchV1 :: "VPN \<Rightarrow> TLBENTRY \<Rightarrow> bool"
   where "EntryVPNMatchV1 vpn e = ((EntryMin4KVPN1 e) \<le> vpn \<and> vpn \<le> EntryMax4KVPN e)"
-    
-    
+        
 definition EntryVPNMatch ::  "TLBENTRY \<Rightarrow> TLBENTRY \<Rightarrow> bool"
   where "EntryVPNMatch e1 e2 = (((EntryRange e1) \<inter> (EntryRange e2)) \<noteq> {})"
 
@@ -1177,7 +1176,9 @@ lemma TLBEntryResetVPN_match :
   by(auto simp:EntryVPNMatch_def EntryRange_def EntryMinVA_def
                TLBEntryResetVPN2_is TLBEntryResetMask_is EntryMaxVA_def
                EntrySize_def KB_def) 
-    
+  
+
+  
 (* ------------------------------------------------------------------------- *)     
 subsection "Matching Entry"
 (* ------------------------------------------------------------------------- *)   
@@ -1190,6 +1191,7 @@ definition EntryMatchVPNASID0 :: "VPN \<Rightarrow> ASID \<Rightarrow> TLBENTRY 
 
 definition EntryMatchVPNASID1 :: "VPN \<Rightarrow> ASID \<Rightarrow> TLBENTRY \<Rightarrow> bool" 
   where "EntryMatchVPNASID1 vpn a e = ((EntryVPNMatchV1 vpn e) \<and> (EntryASIDMatchA a e))"    
+    
     
 text "From the definition, the two entry match if their VPNs and ASIDs match."    
   
@@ -2120,8 +2122,8 @@ text "An attempt to translate a mapped address can result into one of four
   
 datatype MIPSTLBEXN = EXNREFILL | EXNINVALID | EXNMOD | EXNOK
 
-definition MIPSTLB_try_translate :: "MIPSTLB \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> MIPSTLBEXN"
-  where "MIPSTLB_try_translate tlb as vpn =    
+definition MIPSTLB_try_translate2 :: "MIPSTLB \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> MIPSTLBEXN"
+  where "MIPSTLB_try_translate2 tlb as vpn =    
     (if (\<exists>i < (capacity tlb). (EntryMatchVPNASID0 vpn as ((entries tlb) i) ))
       then (
         (if even vpn then 
@@ -2138,6 +2140,24 @@ definition MIPSTLB_try_translate :: "MIPSTLB \<Rightarrow> ASID \<Rightarrow> VP
       )
       else EXNREFILL)"
 
+definition MIPSTLB_try_translate :: "MIPSTLB \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> MIPSTLBEXN"
+  where "MIPSTLB_try_translate tlb as vpn =
+    (if even vpn then 
+      (if (\<exists>i < (capacity tlb). (EntryMatchVPNASID0 vpn as ((entries tlb) i) )) then
+          (if (\<exists>i < (capacity tlb). (EntryMatchVPNASID0 vpn as ((entries tlb) i) ) 
+                    \<and> EntryIsValid0 ((entries tlb) i))
+           then EXNOK
+           else EXNINVALID )
+       else
+       EXNREFILL)
+    else (if (\<exists>i < (capacity tlb). (EntryMatchVPNASID1 vpn as ((entries tlb) i) )) then
+      (if (\<exists>i < (capacity tlb). (EntryMatchVPNASID1 vpn as ((entries tlb) i) ) 
+                    \<and> EntryIsValid1 ((entries tlb) i))
+           then EXNOK
+           else EXNINVALID )
+       else
+        EXNREFILL))"
+    
     
 lemma "\<forall>vpn as tlb. MIPSTLB_try_translate (MIPSR4600TLBinit w tlb) as vpn \<noteq>  EXNOK"    
   apply(simp add:MIPSTLB_try_translate_def)
@@ -2146,27 +2166,20 @@ lemma "\<forall>vpn as tlb. MIPSTLB_try_translate (MIPSR4600TLBinit w tlb) as vp
   apply(simp add:TLBEntryReset_def null_entry_lo_def TLBENTRY.make_def)
   done
 
-lemma "\<And>as . \<forall>vpn tlb. as \<noteq> 0 \<Longrightarrow>  MIPSTLB_try_translate (MIPSR4600TLBinit w tlb) as vpn =  EXNREFILL"
+lemma "\<And>as . \<forall>vpn tlb. as \<noteq> 0 \<Longrightarrow>  
+             MIPSTLB_try_translate (MIPSR4600TLBinit w tlb) as vpn =  EXNREFILL"
   apply(simp add:MIPSTLB_try_translate_def)
   apply(simp add:MIPSR4600TLBinit_def MIPSTLBInit_def)
   apply(simp add:EntryIsValid0_def EntryIsValid1_def)
   apply(simp add:TLBEntryReset_def null_entry_lo_def TLBENTRY.make_def)
-  apply(simp add:EntryMatchVPNASID0_def EntryASIDMatchA_def EntryIsGlobal_def)
+  apply(simp add:EntryMatchVPNASID0_def EntryMatchVPNASID1_def EntryASIDMatchA_def 
+                 EntryIsGlobal_def)
   done
     
-  
-  
-text "The following exception will occur if a virtual address is trying to be
-      resolved, but there is no "  
-  
-definition MIPSTLB_exn_refill :: "MIPSTLB \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> bool" 
-  where "MIPSTLB_exn_refill tlb as vpn = False"
 
 (* ========================================================================= *)  
 section "Translate Function"
 (* ========================================================================= *) 
-
-
   
 definition TLBENTRY_translate_va :: "TLBENTRY \<Rightarrow> nat \<Rightarrow> nat set"
   where
@@ -2201,7 +2214,8 @@ text "The translate function of an initialized TLB is always emtpy"
   
 lemma "MIPSTLB_translate (MIPSTLBInit c w tlb) vpn as = {}"
   by(simp add:MIPSTLB_translate_def MIPSTLBInit_def TLBENTRY_translate_empty)
-    
+  
+   
 (*<*)
 end
 (*>*)
