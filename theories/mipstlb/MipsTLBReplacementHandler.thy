@@ -101,14 +101,23 @@ section "Fault Function"
 text "The fault function ensures that an entry is only updatd if there was no
       translating function"  
   
-definition MipsTLBPT_fault :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> MipsTLBPT set"
-  where "MipsTLBPT_fault  mtlb as vpn = 
+definition MipsTLBPT_fault2 :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> MipsTLBPT set"
+  where "MipsTLBPT_fault2  mtlb as vpn = 
       (if MIPSTLB_translate (tlb mtlb) vpn as  = {} then 
           MipsTLBPT_update_tlb mtlb as vpn
       else {mtlb})"      
     
-
-
+definition MipsTLBPT_fault :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> MipsTLBPT set"
+  where "MipsTLBPT_fault  mtlb as vpn = 
+      (if MIPSTLB_try_translate (tlb mtlb) as vpn = EXNREFILL then 
+          MipsTLBPT_update_tlb mtlb as vpn
+      else {mtlb})"      
+    
+    
+lemma "\<forall>vpn as. MIPSTLB_try_translate (tlb m) as vpn \<noteq> EXNREFILL \<Longrightarrow>
+            (\<forall>m2 \<in> MipsTLBPT_fault m as vpn. m = m2)"
+  by(simp add: MipsTLBPT_fault_def)
+        
     
     
 
@@ -124,6 +133,9 @@ definition MipsTLBPT_translate :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> VP
   where "MipsTLBPT_translate  mtlb as vpn = 
       \<Union>{ MIPSTLB_translate (tlb m) as vpn | m . m \<in> MipsTLBPT_fault mtlb as vpn}"
 
+    
+
+  
   
 (* ========================================================================= *)  
 section "Proofs"
