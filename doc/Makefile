@@ -31,15 +31,18 @@ DOCUMENTATION=machines.pdf model.pdf mipstlb.pdf
 
 all: $(DOCUMENTATION)
 
-machines.pdf : $(wildcard $(THEORIES_ROOT)/machines/*.thy)
+machines.pdf : $(wildcard $(THEORIES_ROOT)/machines/*.thy) \
+			   $(THEORIES_ROOT)/machines/root.tex
 	$(ISABELLE) build -D $(THEORIES_ROOT)/machines
 	cp $(BUILD_PATH)/machines/document.pdf machines.pdf
 
-model.pdf : $(wildcard $(THEORIES_ROOT)/model/*.thy)
+model.pdf : $(wildcard $(THEORIES_ROOT)/model/*.thy) \
+			$(THEORIES_ROOT)/model/root.tex
 	$(ISABELLE) build -D $(THEORIES_ROOT)/model
 	cp $(BUILD_PATH)/model/document.pdf model.pdf
 
-mipstlb.pdf : $(wildcard $(THEORIES_ROOT)/mipstlb/*.thy) 
+mipstlb.pdf : $(wildcard $(THEORIES_ROOT)/mipstlb/*.thy) \
+			  $(THEORIES_ROOT)/mipstlb/root.tex
 	$(ISABELLE) build -D $(THEORIES_ROOT)/mipstlb 
 	cp $(BUILD_PATH)/mipstlb/document.pdf mipstlb.pdf
 
