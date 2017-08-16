@@ -2,5 +2,11 @@ session "MIPSTLB" = "HOL" +
     options [document = pdf, document_output = "../../build/doc/mipstlb"]
     theories
         MipsTLB
+        MipsTLBPageTable
+        MipsTLBReplacementHandlerDeter
+        MipsTLBReplacementHandler
+        MipsTLBLarge
+        MipsTLBEquivalence
+        
     document_files (in ".")
         "root.tex"
