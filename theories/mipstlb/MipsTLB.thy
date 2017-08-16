@@ -25,6 +25,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 *)
 
+(* ######################################################################### *) 
+chapter "The MIPS R4600 TLB Model - A software loaded TLB"
+(* ######################################################################### *)
 
 
 (*<*)
@@ -1326,6 +1329,7 @@ next
   qed              
 qed      
 
+  
 
 lemma EntryMatch_true :
   "\<forall>e. EntryMatch e e = True"
@@ -1334,7 +1338,178 @@ lemma EntryMatch_true :
 lemma EntryMatch_commute :
   "\<forall>e f. EntryMatch e f = EntryMatch f e"
   by(simp add:EntryMatch_def EntryVPNMatch_commute EntryASIDMatch_commute)
+
+lemma EntryVPNMatchV_equals_odd :
+  assumes vodd : "odd vpn"
+    and  vpn2even:  "even (vpn2 (hi (e)))"
+    and  mask4k:   "(mask (e)) = MASK4K"
+  shows "EntryVPNMatchV vpn (e) = EntryVPNMatchV (vpn - 1) (e)"
+proof 
+  assume match: "EntryVPNMatchV vpn (e)"
+  show " EntryVPNMatchV (vpn - 1) (e)" 
+  proof - 
+         
+  from match have X0:
+    "(vpn2 (hi (e)) \<le> vpn)"
+    by(simp add:EntryVPNMatchV_def EntryMin4KVPN_def EntryMax4KVPN_def 
+                num_4k_pages_def mask4k)
+  
+  from match have X1:
+    "vpn \<le> Suc (vpn2 (hi (e)))"
+    by(simp add:EntryVPNMatchV_def EntryMin4KVPN_def EntryMax4KVPN_def 
+                num_4k_pages_def mask4k)      
+      
+  from vpn2even X0 vodd have X2: 
+    "(vpn2 (hi (e)) \<le> (vpn - 1))"
+  proof -
+    from vpn2even vodd have Y0: "(vpn2 (hi (e))) \<noteq> vpn"
+      by(auto)
+    from X0 vpn2even vodd Y0 show ?thesis 
+      by(auto)
+  qed
+      
+  from X1 have X3:
+    "vpn - 1 \<le> Suc (vpn2 (hi (e)))" 
+    by(auto)
+  
+  have X4: "EntryVPNMatchV (vpn - 1) (e) = 
+     (vpn2 (hi (e)) \<le> vpn - 1 \<and> vpn - 1 \<le> Suc (vpn2 (hi (e))))"
+    by(simp add:EntryVPNMatchV_def EntryMin4KVPN_def EntryMax4KVPN_def 
+                num_4k_pages_def mask4k) 
+  
+    from X2 X3 X4 show ?thesis 
+      by(auto)
+  qed
+next
+  assume match2: "EntryVPNMatchV (vpn - 1) (e) "
+  show "EntryVPNMatchV vpn (e)" 
+  proof -
+      
+  from match2 have X0:
+    "(vpn2 (hi (e)) \<le> (vpn - 1))"
+    by(simp add:EntryVPNMatchV_def EntryMin4KVPN_def EntryMax4KVPN_def 
+                num_4k_pages_def mask4k)
+  
+  from match2 have X1:
+    "(vpn - 1) \<le> Suc (vpn2 (hi (e)))"
+    by(simp add:EntryVPNMatchV_def EntryMin4KVPN_def EntryMax4KVPN_def 
+                num_4k_pages_def mask4k)      
+      
+  from vpn2even X0 vodd have X2: 
+    "(vpn2 (hi (e)) \<le> vpn)"
+    by(auto)
+      
+  from X1 vpn2even vodd have X3:
+    "vpn  \<le> Suc (vpn2 (hi (e)))"
+  proof -
+    from vpn2even have Y0:
+      "odd (Suc (vpn2 (hi (e))))"
+      by(auto)
+    from vodd have Y1:
+      "even (vpn - 1)"
+      by(auto)
+         
+    from Y1 Y0  have Y2:
+      "vpn \<noteq> (Suc (Suc (vpn2 (hi (e)))))"
+      by(auto)
+        
+    from X1 vpn2even vodd Y0 Y2 show ?thesis 
+      by(auto)
+  qed
+      
+  have X4: "EntryVPNMatchV vpn e = 
+    (vpn2 (hi (e)) \<le> vpn  \<and> vpn  \<le> Suc (vpn2 (hi (e))))"
+    by(simp add:EntryVPNMatchV_def EntryMin4KVPN_def EntryMax4KVPN_def
+                num_4k_pages_def mask4k) 
+  
+    from X2 X3 X4 show ?thesis 
+      by(auto)
+  qed
+qed
+  
+lemma EntryMatch_equals_odd :
+  assumes eodd: "odd vpn"
+    and  vpn2even:  "even (vpn2 (hi (e)))"
+    and  mask4k:   "(mask (e)) = MASK4K"
+  shows "EntryMatchVPNASID vpn as e = EntryMatchVPNASID (vpn - 1)  as e"
+proof cases
+  assume match : "EntryMatchVPNASID vpn as e"
+  then show ?thesis 
+  proof -
+    from match have X0:
+      "EntryASIDMatchA as e"
+      by(simp add:EntryMatchVPNASID_def)
+    from match have X1:
+      "EntryVPNMatchV vpn e"
+      by(simp add:EntryMatchVPNASID_def)
     
+    from eodd vpn2even mask4k have X3:
+      "EntryVPNMatchV vpn e = EntryVPNMatchV (vpn - 1) e"
+      by(simp add:EntryVPNMatchV_equals_odd)
+    
+    have X4: "EntryMatchVPNASID (vpn - 1)  as e = 
+        (EntryVPNMatchV (vpn - 1) e \<and> EntryASIDMatchA as e)"
+       by(simp add:EntryMatchVPNASID_def)
+    
+     from match X4 X0 X3 X1 show ?thesis 
+       by(auto)
+  qed
+next
+  assume nmatch : "\<not> EntryMatchVPNASID vpn as e"
+  then show ?thesis 
+  proof cases
+    assume asidmatch: "EntryASIDMatchA as e"
+    then show ?thesis 
+    proof -
+      from nmatch asidmatch have X0:
+        "\<not>EntryVPNMatchV vpn e"
+        by(simp add:EntryMatchVPNASID_def)
+      
+      from  vpn2even mask4k eodd have X1:
+        "EntryVPNMatchV vpn e = EntryVPNMatchV (vpn - 1) e"
+        by(simp add:EntryVPNMatchV_equals_odd)
+
+      have X2: "EntryMatchVPNASID (vpn - 1)  as e = 
+        (EntryVPNMatchV (vpn - 1) e \<and> EntryASIDMatchA as e)"
+       by(simp add:EntryMatchVPNASID_def)
+          
+      from nmatch X0 X1 X2 show ?thesis 
+        by(auto)
+    qed
+  next
+    assume nasidmatch: "\<not>EntryASIDMatchA as e"
+    then show ?thesis 
+    proof -
+      have X0: "EntryMatchVPNASID (vpn - 1)  as e = 
+        (EntryVPNMatchV (vpn - 1) e \<and> EntryASIDMatchA as e)"
+        by(simp add:EntryMatchVPNASID_def)
+      
+      from nmatch nasidmatch X0 show ?thesis 
+        by(auto)
+    qed
+  qed    
+qed
+  
+
+lemma EntryMatch_equals_even :
+  assumes eeven: "even vpn"
+      and vpn2even: "even (vpn2 (hi (e)))"
+      and mask4k: "(mask (e)) = MASK4K"
+    shows "EntryMatchVPNASID vpn as e = EntryMatchVPNASID (vpn + 1)  as e"
+proof -
+  from eeven have X0 :
+    "odd (vpn + 1)"
+    by(auto)
+  
+  from vpn2even X0 mask4k have X1: 
+    "EntryMatchVPNASID (vpn + 1) as e = EntryMatchVPNASID ((vpn + 1) -1)  as e"
+    by(auto simp:EntryMatch_equals_odd)
+   
+  from X1 show ?thesis 
+    by(auto)
+qed
+
+  
 (* ------------------------------------------------------------------------- *)   
 subsection "TLB Entry Ranges"
 (* ------------------------------------------------------------------------- *)   
@@ -1347,6 +1522,10 @@ definition ValidIndexRange :: "MIPSTLB \<Rightarrow> nat set"
 definition RandomIndexRange :: "MIPSTLB \<Rightarrow> nat set"  
   where "RandomIndexRange tlb =  {x.  (wired tlb) \<le> x \<and> x < (capacity tlb)}"
 
+
+lemma RandomIndex_in_capacity:
+"\<And>i. i \<in> RandomIndexRange tlb \<Longrightarrow>  i < (capacity tlb)"
+  by(simp add:RandomIndexRange_def)
     
 
     
@@ -1425,23 +1604,24 @@ text "The TLB is in a valid state if all entries are valid with respect to
       modification of the TLB, this must hold. "
   
 definition TLBValid_orig :: "MIPSTLB \<Rightarrow> bool"
-  where "TLBValid_orig tlb = (((wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+  where "TLBValid_orig tlb = (((wired tlb) < (capacity tlb)  \<and> (wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                         (TLBEntryWellFormed tlb i) \<and> (
                         (i = j) \<or> \<not> EntryMatch ((entries tlb) i) ((entries tlb j)))))"    
 
 definition TLBValid:: "MIPSTLB \<Rightarrow> bool"
-  where "TLBValid tlb = (((wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb).  
+  where "TLBValid tlb = (((wired tlb) < (capacity tlb)  \<and> (wired tlb) < TLBMaximumWired  ) \<and> (\<forall>i < (capacity tlb).  
                         (TLBEntryWellFormed tlb i) \<and> ((TLBEntryConflictSet (entries tlb i) tlb) \<subseteq> {i})))"    
 
 definition TLBValidER :: "MIPSTLB \<Rightarrow> bool"
-  where "TLBValidER tlb = (((wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb).  
+  where "TLBValidER tlb = (((wired tlb) < (capacity tlb) \<and> (wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb).  
                         (TLBEntryWellFormed tlb i) \<and> ((TLBEntryConflictSetER (entries tlb i) tlb) \<subseteq> {i})))"      
     
     
 text "The TLBValid using conflict sets must be equal to the original TLBValid definition"    
   
-lemma "TLBValid tlb = TLBValid_orig tlb"
-  by(auto simp add:TLBValid_def TLBValid_orig_def TLBEntryConflictSet_def )
+lemma TLBValid_orig_isTLBValid:
+  "TLBValid tlb = TLBValid_orig tlb"
+  by(auto simp add:TLBValid_def TLBValid_orig_def TLBEntryConflictSet_def)
         
 
 lemma TLBValidImpliesWired :
@@ -1470,14 +1650,14 @@ proof -
   fix i j
   assume valid : "TLBValidER tlb"
   
-  from valid have wired: "wired tlb < TLBMaximumWired" 
+  from valid have wired: "wired tlb < TLBMaximumWired \<and>  wired tlb < capacity tlb" 
      by(simp add:TLBValidER_def valid)
   from valid have wellformed : " \<forall>j<(capacity tlb). TLBEntryWellFormed tlb j"
      by(simp add:TLBValidER_def valid)    
     
-   have X0: "TLBValidER tlb = (wired tlb < TLBMaximumWired \<and> (\<forall>i<(capacity tlb). 
+   have X0: "TLBValidER tlb = (wired tlb < TLBMaximumWired \<and> wired tlb < capacity tlb \<and> (\<forall>i<(capacity tlb). 
                   TLBEntryWellFormed tlb i \<and> TLBEntryConflictSetER (entries tlb i) tlb \<subseteq> {i}))"
-    by(simp add:TLBValidER_def) 
+    by(auto simp add:TLBValidER_def) 
 
   hence X2:  "... =  (\<forall>i<(capacity tlb). {ia. ia < (capacity tlb) \<and> 
                           EntryExtendedRange (entries tlb ia) \<inter>
@@ -1488,7 +1668,9 @@ proof -
                   EntryExtendedRange (entries tlb i) \<inter> EntryExtendedRange (entries tlb j) = {}"
     by(auto)        
 qed  
-   
+
+  
+  
   
 text "TLBValid is the same as TLBValidER"  
 
@@ -1499,12 +1681,12 @@ proof
   proof - 
     assume valid: "TLBValid tlb"
       
-    have X0: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+    have X0: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired \<and>  wired tlb < capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                            (TLBEntryWellFormed tlb i) \<and> (
                            (i = j) \<or> \<not> EntryMatchER ((entries tlb) i) ((entries tlb j)))))"
       by(auto simp add:TLBValidER_def TLBEntryConflictSetER_def)
     
-    also  have X1: "TLBValid tlb =  (((wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+    also  have X1: "TLBValid tlb =  (((wired tlb) < TLBMaximumWired  \<and>  wired tlb < capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                                 (TLBEntryWellFormed tlb i) \<and> (
                                 (i = j) \<or> \<not> EntryMatch ((entries tlb) i) ((entries tlb j)))))"
       by(auto simp add:TLBValid_def TLBEntryConflictSet_def)
@@ -1513,7 +1695,7 @@ proof
     with valid have wf: "\<forall>i < (capacity tlb). TLBENTRYWellFormed (entries tlb i)"
       by(auto simp add:TLBValidImpliesWellFormed)
     
-    with valid wf nz have X2: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+    with valid wf nz have X2: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired  \<and>  wired tlb < capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                            (TLBEntryWellFormed tlb i) \<and> (
                            (i = j) \<or> \<not> EntryMatch ((entries tlb) i) ((entries tlb j)))))"
       by(simp add:X0 EntryMatchEqualsEntryMatchER)
@@ -1527,12 +1709,12 @@ proof
   proof - 
     fix i
     assume valid: "TLBValidER tlb"
-    have X0: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+    have X0: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired  \<and>  wired tlb < capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                            (TLBEntryWellFormed tlb i) \<and> (
                            (i = j) \<or> \<not> EntryMatchER ((entries tlb) i) ((entries tlb j)))))"
       by(auto simp add:TLBValidER_def TLBEntryConflictSetER_def)
     
-    also  have X1: "TLBValid tlb =  (((wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+    also  have X1: "TLBValid tlb =  (((wired tlb) < TLBMaximumWired  \<and>  wired tlb < capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                                 (TLBEntryWellFormed tlb i) \<and> (
                                 (i = j) \<or> \<not> EntryMatch ((entries tlb) i) ((entries tlb j)))))"
       by(auto simp add:TLBValid_def TLBEntryConflictSet_def)
@@ -1551,8 +1733,181 @@ proof
   qed        
 qed    
     
+  
+lemma even_vpn_compare:  
+  assumes aeven: "even (a::nat)"
+      and eeven: " even (vpn::nat)"
+      and prec: "a \<le> vpn \<and> vpn \<le> Suc a"
+    shows "vpn = a"
+proof -
+  from aeven have X0: "odd (Suc a)"
+    by(auto)
+      
+  from X0 eeven have X1: "vpn \<noteq> (Suc a)"
+    by(auto)
+      
+  from X1 eeven have X3: "(a \<le> vpn \<and> vpn \<le> Suc a) = (a \<le> vpn \<and> vpn < Suc a)"
+    by(auto)
+      
+  from X3 have X4: " ... =  (a \<le> vpn \<and> vpn \<le> a)"
+    by(auto)
+      
+  from X4 have X5: "(a \<le> vpn \<and> vpn \<le> a) \<longrightarrow> vpn = a"
+    by(auto)
 
+  from prec aeven eeven X0 X1 X3 X4 X5  show "vpn = a"
+    by(auto)      
+qed  
+
+lemma TLBValid_implies_no_other_match :
+  assumes valid : "TLBValid tlb"
+     and inrange: "j < (capacity tlb)"
+      and inrange2: "i < (capacity tlb)" 
+      and mask4k : "\<forall>idx < (capacity tlb). mask ((entries tlb) idx) = MASK4K" 
+      and match : "EntryMatchVPNASID vpn as (entries tlb i)" 
+    shows "i = j \<longleftrightarrow> EntryMatchVPNASID vpn as (entries tlb j)"
+proof cases
+  assume eq: "i = j"
+  then show ?thesis 
+  proof -
+    from eq have X0: "(entries tlb i) = (entries tlb j)"
+      by(auto)
+        
+    from eq match X0 show ?thesis 
+      by(auto)
+  qed
+next
+  assume neq: "i \<noteq> j"
+  then show ?thesis 
+  proof -
+    from valid have X0: 
+      "(((wired tlb) < (capacity tlb)  \<and> (wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+                        (TLBEntryWellFormed tlb i) \<and> (
+                        (i = j) \<or> \<not> EntryMatch ((entries tlb) i) ((entries tlb j)))))"
+      by(auto simp add:TLBValid_def TLBValid_orig_def TLBEntryConflictSet_def)
+    
+    from X0 neq inrange inrange2 have X1:
+      "\<not> EntryMatch ((entries tlb) i) ((entries tlb j))"
+      by(auto)
+    
+    from X1 have X2: "\<not>((EntryVPNMatch ((entries tlb) i)  ((entries tlb j))) 
+                        \<and> (EntryASIDMatch ((entries tlb) i)  ((entries tlb j))))" 
+      by(simp add:EntryMatch_def)
+    
+    from valid have vpn2even:
+      "\<forall>x < (capacity tlb). even (vpn2 (hi (entries tlb x)))"
+      by(simp add:TLBValid_def TLBEntryWellFormed_def TLBENTRYWellFormed_def
+                     TLBENTRYHIWellFormed_def VPN2Valid_def)
+        
+    show ?thesis
+    proof cases
+      assume vpnmatch : "EntryVPNMatch ((entries tlb) i)  ((entries tlb j))"
+      then show ?thesis 
+      proof -
+        from vpnmatch X2 have Y0:
+          "\<not>(EntryASIDMatch ((entries tlb) i)  ((entries tlb j)))"
+          by(auto)
+            
+        from Y0 have Y1: "\<not> EntryIsGlobal ((entries tlb) i)"
+          by(simp add:EntryASIDMatch_def)
+            
+        from Y1 match have Y2: "(asid (hi ((entries tlb) i))) = as"
+          by(simp add:EntryMatchVPNASID_def EntryASIDMatchA_def)
+        
+        from Y0 have Y3:
+          "\<not>EntryASIDMatchA (asid (hi ((entries tlb) i))) ((entries tlb j))"
+          by(simp add:EntryASIDMatch_def EntryASIDMatchA_def)
+        
+        from Y3 Y2 have Y4: "\<not>EntryASIDMatchA as ((entries tlb j))"
+          by(auto)
+            
+        from Y4 have Y5: "\<not>EntryMatchVPNASID vpn as (entries tlb j)"
+          by(simp add:EntryMatchVPNASID_def)
           
+        from neq Y5 show ?thesis
+          by(auto)
+      qed
+    next
+      assume nvpnmatch : "\<not>EntryVPNMatch ((entries tlb) i)  ((entries tlb j))"
+      then show ?thesis
+      proof cases
+        assume veven: "even vpn"
+        then show ?thesis
+        proof -
+          from nvpnmatch vpn2even mask4k inrange2 inrange veven have Y0:
+            "\<not>EntryVPNMatchV (vpn2 (hi (entries tlb i))) (entries tlb j)"
+            apply(simp add:EntryVPNMatch_def EntryRange_def EntryMinVA_def EntryMaxVA_def KB_def EntrySize_def page_size_def)
+            apply(simp add:EntryVPNMatchV_def EntryMin4KVPN_def EntryMax4KVPN_def num_4k_pages_def)
+            apply(auto)
+            done
+          
+          from inrange2 veven match vpn2even mask4k have Y1: 
+            "(vpn2 (hi (entries tlb i))) = vpn"
+            apply(simp add:EntryMatchVPNASID_def EntryVPNMatchV_def EntryMin4KVPN_def 
+                           EntryMax4KVPN_def num_4k_pages_def)
+            apply(auto simp:even_vpn_compare)          
+            done
+          
+          from Y1 Y0 have Y3:
+           "\<not>EntryVPNMatchV vpn (entries tlb j)"
+            by(auto)
+           
+          from Y3 have Y4:
+            "\<not>EntryMatchVPNASID vpn as (entries tlb j)"
+            by(auto simp:EntryMatchVPNASID_def)
+          from neq Y4 show ?thesis 
+            by(auto)
+        qed
+      next
+        assume vodd: "odd vpn"
+        then show ?thesis
+        proof -
+          from nvpnmatch vpn2even mask4k inrange2 inrange vodd have Y0:
+            "\<not>EntryVPNMatchV (vpn2 (hi (entries tlb i))) (entries tlb j)"
+            apply(simp add:EntryVPNMatch_def EntryRange_def EntryMinVA_def EntryMaxVA_def KB_def EntrySize_def page_size_def)
+            apply(simp add:EntryVPNMatchV_def EntryMin4KVPN_def EntryMax4KVPN_def num_4k_pages_def)
+            apply(auto)
+            done
+              
+          from inrange2 vodd match vpn2even mask4k have Y1: 
+            "(vpn2 (hi (entries tlb i))) = vpn - 1"
+            apply(simp add:EntryMatchVPNASID_def EntryVPNMatchV_def EntryMin4KVPN_def 
+                           EntryMax4KVPN_def num_4k_pages_def)
+            apply(auto simp:even_vpn_compare)          
+            done              
+          
+          from Y1 Y0 have Y3:
+           "\<not>EntryVPNMatchV (vpn - 1) (entries tlb j)"
+            by(auto)
+          
+          from Y3 have Y4:
+            "\<not>EntryMatchVPNASID (vpn - 1) as (entries tlb j)"
+            by(auto simp:EntryMatchVPNASID_def)
+          
+          from inrange valid have vpn2even:
+            "(even (vpn2 (hi (entries tlb j))))"
+            by(simp add:TLBValid_def TLBEntryWellFormed_def TLBENTRYWellFormed_def 
+                        TLBENTRYHIWellFormed_def VPN2Valid_def)
+
+          from inrange mask4k have Y6:
+            " (mask ( (entries tlb j))) = MASK4K"
+            by(auto)
+                      
+          from Y4 vpn2even vodd Y6 have  Y5:
+           "(\<not>EntryMatchVPNASID (vpn) as (entries tlb j))
+               = (\<not>EntryMatchVPNASID (vpn - 1) as (entries tlb j))"
+             by(auto simp add:EntryMatch_equals_odd)
+                
+          from neq Y4 Y5 show ?thesis 
+            by(auto)
+        qed          
+      qed
+        
+    qed
+  qed
+qed
+
+ 
     
 (* ========================================================================= *)
 section "TLB Initialization"
@@ -1607,7 +1962,7 @@ text "If we reset the TLB and initialize it with a valid number of wired entries
       then the TLB will end up in a valid state"    
     
 lemma InitializedTLBIsValid : 
-  "\<And>tlb w c. TLB_in_reset tlb \<Longrightarrow>  (2 * c) < VPN2Max MASK4K \<Longrightarrow>
+  "\<And>tlb w c. TLB_in_reset tlb \<Longrightarrow> w < c \<and> (2 * c) < VPN2Max MASK4K \<Longrightarrow>
          w < TLBMaximumWired \<Longrightarrow> TLBValid (MIPSTLBInit c w tlb)"
   apply(simp add:TLBValid_def TLBEntryWellFormed_def)
   apply(simp add:TLBEntryConflictSet_def)
@@ -1677,31 +2032,35 @@ lemma InvalidTLBWired0 : " wired invalid_tlb = 0"
 lemma InvalidTLBNotValid : 
   "(TLBValid invalid_tlb) = False"
 proof -
+
+  have wired: "wired invalid_tlb < capacity invalid_tlb"
+    by(simp add:invalid_tlb_def MIPSR4600Capacity_def)
+      
   have v: "TLBValid invalid_tlb = 
       (((wired invalid_tlb) < TLBMaximumWired ) \<and> 
       (\<forall>i < (capacity invalid_tlb). 
           \<forall>j < (capacity invalid_tlb). 
             (TLBEntryWellFormed invalid_tlb i) \<and> (
            (i = j) \<or> \<not> EntryMatch ((entries invalid_tlb) i) ((entries invalid_tlb j)))))"
-     by(auto simp add:TLBValid_def TLBValid_orig_def TLBEntryConflictSet_def)
+     by(auto simp add:TLBValid_def TLBValid_orig_def TLBEntryConflictSet_def wired)
   
    have X0: " ... =  
-        (wired invalid_tlb < TLBMaximumWired \<and> 
+        (wired invalid_tlb < TLBMaximumWired  \<and> 
         (\<forall>i<(capacity invalid_tlb). 
           \<forall>j<(capacity invalid_tlb). 
             TLBEntryWellFormed invalid_tlb i \<and> 
             (i = j \<or> \<not> EntryMatch null_entry null_entry)))"
      by(auto simp add:InvalidTLBAllNullEntries)
   
-   have X1: "... =  (wired invalid_tlb < TLBMaximumWired \<and> 
+   have X1: "... =  (wired invalid_tlb < TLBMaximumWired  \<and> 
                 (\<forall>i<(capacity invalid_tlb).
                    \<forall>j<(capacity invalid_tlb). 
                     TLBEntryWellFormed invalid_tlb i \<and> (i = j)))"
      by(auto simp add:NullEntriesMatch)
    
-   have X2: "... = (\<forall>i<(capacity invalid_tlb). 
+   have X2: "... =  (\<forall>i<(capacity invalid_tlb). 
                       \<forall>j<(capacity invalid_tlb). 
-                        TLBEntryWellFormed invalid_tlb i \<and> (i = j))"
+                        TLBEntryWellFormed invalid_tlb i \<and> (i = j)) "
      by(auto simp add:InvalidTLBWired0 TLBMaximumWired_def)
     
    have X3: "... = (\<forall>i<(capacity invalid_tlb). \<forall>j<(capacity invalid_tlb). (i = j))" 
@@ -1834,10 +2193,14 @@ proof
                                     entries = (entries tlb)(idx := e)\<rparr>"
      by(simp add:tlbwi_def ir)
       
-   have X1:  "TLBValid tlb \<Longrightarrow> (wired tlb) < TLBMaximumWired"
+   have X1:  "TLBValid tlb \<Longrightarrow>(wired tlb) < (capacity tlb) \<and> (wired tlb) < TLBMaximumWired "
      by(simp add: TLBValid_def)
        
-   have X2:  "(wired \<lparr>capacity = capacity tlb, 
+   have X2:  "(wired  \<lparr>capacity = capacity tlb, 
+                     wired = wired tlb, 
+                     entries = (entries tlb)(idx := e)\<rparr>) < (capacity  \<lparr>capacity = capacity tlb, 
+                     wired = wired tlb, 
+                     entries = (entries tlb)(idx := e)\<rparr>) \<and> (wired \<lparr>capacity = capacity tlb, 
                      wired = wired tlb, 
                      entries = (entries tlb)(idx := e)\<rparr> < TLBMaximumWired)"
      by(simp add:  X1 tlbvalid )
@@ -1865,7 +2228,7 @@ proof
                   \<lparr> capacity = capacity tlb, 
                     wired = wired tlb, 
                     entries = (entries tlb)(idx := e)\<rparr> \<subseteq> {i})"
-     by(simp only:TLBValid_def tlbvalid X2, auto)
+     by(simp only:TLBValid_def tlbvalid X2 X1, auto)
    
    have X6 : "... = (\<forall>i<(capacity tlb).
          (TLBEntryWellFormed tlb i) \<and> TLBENTRYWellFormed e \<and>
@@ -2123,25 +2486,7 @@ text "An attempt to translate a mapped address can result into one of four
 datatype MIPSTLBEXN = EXNREFILL | EXNINVALID | EXNMOD | EXNOK
 
 definition MIPSTLB_try_translate2 :: "MIPSTLB \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> MIPSTLBEXN"
-  where "MIPSTLB_try_translate2 tlb as vpn =    
-    (if (\<exists>i < (capacity tlb). (EntryMatchVPNASID0 vpn as ((entries tlb) i) ))
-      then (
-        (if even vpn then 
-          (if (\<exists>i < (capacity tlb). (EntryMatchVPNASID0 vpn as ((entries tlb) i) ) 
-                    \<and> EntryIsValid0 ((entries tlb) i))
-           then EXNOK
-           else EXNINVALID )
-      else 
-           (if (\<exists>i < (capacity tlb). (EntryMatchVPNASID0 vpn as ((entries tlb) i) ) 
-                    \<and> EntryIsValid1 ((entries tlb) i))
-           then EXNOK
-           else EXNINVALID )
-        )
-      )
-      else EXNREFILL)"
-
-definition MIPSTLB_try_translate :: "MIPSTLB \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> MIPSTLBEXN"
-  where "MIPSTLB_try_translate tlb as vpn =
+  where "MIPSTLB_try_translate2 tlb as vpn =
     (if even vpn then 
       (if (\<exists>i < (capacity tlb). (EntryMatchVPNASID0 vpn as ((entries tlb) i) )) then
           (if (\<exists>i < (capacity tlb). (EntryMatchVPNASID0 vpn as ((entries tlb) i) ) 
@@ -2158,6 +2503,21 @@ definition MIPSTLB_try_translate :: "MIPSTLB \<Rightarrow> ASID \<Rightarrow> VP
        else
         EXNREFILL))"
     
+definition MIPSTLB_try_translate :: "MIPSTLB \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> MIPSTLBEXN"
+  where "MIPSTLB_try_translate tlb as vpn =
+   (if (\<exists>i < (capacity tlb). (EntryMatchVPNASID vpn as ((entries tlb) i) )) then
+     (if (\<exists>i < (capacity tlb). (EntryMatchVPNASID0 vpn as ((entries tlb) i) ) 
+                                  \<and> EntryIsValid0 ((entries tlb) i)) then
+      EXNOK
+    else 
+       (if (\<exists>i < (capacity tlb). (EntryMatchVPNASID1 vpn as ((entries tlb) i) ) 
+                                   \<and> EntryIsValid1 ((entries tlb) i)) then 
+       EXNOK 
+       else EXNINVALID )
+    )
+    else EXNREFILL)"
+    
+ 
     
 lemma "\<forall>vpn as tlb. MIPSTLB_try_translate (MIPSR4600TLBinit w tlb) as vpn \<noteq>  EXNOK"    
   apply(simp add:MIPSTLB_try_translate_def)
@@ -2172,11 +2532,61 @@ lemma "\<And>as . \<forall>vpn tlb. as \<noteq> 0 \<Longrightarrow>
   apply(simp add:MIPSR4600TLBinit_def MIPSTLBInit_def)
   apply(simp add:EntryIsValid0_def EntryIsValid1_def)
   apply(simp add:TLBEntryReset_def null_entry_lo_def TLBENTRY.make_def)
-  apply(simp add:EntryMatchVPNASID0_def EntryMatchVPNASID1_def EntryASIDMatchA_def 
+  apply(simp add:EntryMatchVPNASID_def EntryMatchVPNASID1_def EntryASIDMatchA_def 
                  EntryIsGlobal_def)
   done
     
-
+lemma MIPSTLB_try_translate_exist_match :
+    assumes translates:  "MIPSTLB_try_translate tlb as vpn \<noteq> EXNREFILL"
+    shows "(\<exists>i<capacity tlb. EntryMatchVPNASID vpn as (entries tlb i))"
+proof cases
+  assume exist : "(\<exists>i<capacity tlb. EntryMatchVPNASID vpn as (entries tlb i))"
+  then show ?thesis
+  proof -
+    from exist have X0: "MIPSTLB_try_translate tlb as vpn \<noteq> EXNREFILL"
+      by(simp add:MIPSTLB_try_translate_def)
+    from exist translates X0 show ?thesis 
+      by(auto)
+   qed
+next
+   assume nexist : "\<not>(\<exists>i<capacity tlb. EntryMatchVPNASID vpn as (entries tlb i))"
+   then show ?thesis 
+   proof -
+     from nexist have X0: "MIPSTLB_try_translate tlb as vpn = EXNREFILL"
+       by(simp add:MIPSTLB_try_translate_def)
+     from nexist translates X0 show ?thesis 
+       by(auto)
+   qed
+ qed
+   
+   
+lemma MIPSTLB_fault_no_match :
+  assumes fault: "MIPSTLB_try_translate tlb as vpn = EXNREFILL"
+    shows "(\<forall>i<capacity tlb. \<not>EntryMatchVPNASID vpn as (entries tlb i))"
+proof cases
+  assume exist : "(\<exists>i<capacity tlb. EntryMatchVPNASID vpn as (entries tlb i))"
+  then show ?thesis 
+  proof -
+    from exist have X0: "MIPSTLB_try_translate tlb as vpn \<noteq> EXNREFILL"
+      by(simp add:MIPSTLB_try_translate_def)
+    from exist fault X0 show ?thesis 
+      by(auto)
+  qed
+next
+  assume nexist : "\<not>(\<exists>i<capacity tlb. EntryMatchVPNASID vpn as (entries tlb i))"
+  then show ?thesis 
+  proof -
+    from nexist have X0: "(\<forall>i<capacity tlb. \<not>EntryMatchVPNASID vpn as (entries tlb i))"
+      by(auto)
+    from nexist have X1: "MIPSTLB_try_translate tlb as vpn = EXNREFILL"
+      by(auto simp add:MIPSTLB_try_translate_def)
+    from nexist fault X0 X1 show ?thesis 
+      by(auto)
+  qed
+qed
+  
+      
+  
 (* ========================================================================= *)  
 section "Translate Function"
 (* ========================================================================= *) 
@@ -2189,33 +2599,76 @@ definition TLBENTRY_translate_va :: "TLBENTRY \<Rightarrow> nat \<Rightarrow> na
       (if EntryIsValid1 e \<and> va \<in> EntryExtendedRange1 e then
            {EntryPA1 e + ((va mod VASize) - EntryMinVA1 e)} else {})"  
 
-definition TLBENTRY_translate :: "TLBENTRY \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> PFN set"
+definition TLBENTRY_translate2 :: "TLBENTRY \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> PFN set"
   where
-    "TLBENTRY_translate e as vpn =
+    "TLBENTRY_translate2 e as vpn =
       (if EntryIsValid0 e \<and> EntryMatchVPNASID0 vpn as e then 
           {(pfn (lo0 e)) + (vpn - EntryMin4KVPN e)} else {}) \<union>
       (if EntryIsValid1 e \<and> EntryMatchVPNASID1 vpn as e then
            {(pfn (lo1 e)) +  (vpn - EntryMin4KVPN1 e)} else {})"      
 
+    
+definition TLBENTRY_translate :: "TLBENTRY \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> PFN set"
+  where
+    "TLBENTRY_translate e as vpn =
+      (if EntryMatchVPNASID vpn as e then
+       (if even vpn \<and> EntryIsValid0 e then
+          {(pfn (lo0 e)) + (vpn - EntryMin4KVPN e)}
+        else 
+          (if odd vpn \<and> EntryIsValid1 e then
+            {(pfn (lo1 e)) + (vpn - EntryMin4KVPN1 e)} 
+           else {}) )
+       else {})"    
+
+    
 text "The translate function of a reset entry is  always emtpy"
   
 lemma TLBENTRY_translate_empty:
-  "\<forall>i vpn as. TLBENTRY_translate (TLBEntryReset (i)) vpn as = {}"
+  "\<forall>i vpn as. TLBENTRY_translate (TLBEntryReset (i)) as vpn = {}"
   by(simp add:TLBEntryReset_def TLBENTRY.make_def null_entry_lo_def 
               TLBENTRY_translate_def EntryIsValid0_def EntryIsValid1_def)
     
     
 definition MIPSTLB_translate :: "MIPSTLB \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> PFN set"
   where "MIPSTLB_translate tlb as vpn = {pa | i pa . 
-                                                pa \<in> TLBENTRY_translate ((entries tlb) i) vpn as 
+                                                pa \<in> TLBENTRY_translate ((entries tlb) i) as vpn 
                                                 \<and> i < (capacity tlb) }"  
 
 text "The translate function of an initialized TLB is always emtpy"
   
-lemma "MIPSTLB_translate (MIPSTLBInit c w tlb) vpn as = {}"
+lemma "MIPSTLB_translate (MIPSTLBInit c w tlb) as vpn = {}"
   by(simp add:MIPSTLB_translate_def MIPSTLBInit_def TLBENTRY_translate_empty)
   
-   
+
+
+    
+lemma "\<And>vpn as. MIPSTLB_try_translate t as vpn = EXNREFILL \<Longrightarrow>
+        MIPSTLB_translate t as vpn = {}"
+  oops
+    
+    
+
+lemma MIPSTLB_fault_no_translate:
+  assumes fault: "MIPSTLB_try_translate t as vpn = EXNREFILL"
+    and inrange : "i < (capacity t)"
+    shows " (TLBENTRY_translate (entries t i) as vpn) = {}"
+proof -
+  from fault inrange have X0: "\<not>EntryMatchVPNASID vpn as (entries t i)"
+    by(auto simp add:MIPSTLB_fault_no_match)
+    
+  from X0 show ?thesis by(simp add:TLBENTRY_translate_def)    
+qed
+      
+    
+    
+(*
+MIPSTLB_try_translate_exist_match :
+    assumes translates:  "MIPSTLB_try_translate tlb as vpn \<noteq> EXNREFILL"
+    shows "(\<exists>i<capacity tlb. EntryMatchVPNASID vpn as (entries tlb i))"
+
+
+ *)    
+    
 (*<*)
 end
 (*>*)

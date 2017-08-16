@@ -25,6 +25,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 *)
 
+(* ######################################################################### *) 
+chapter "Deterministic Exception Handler for the MIPS R4600"
+(* ######################################################################### *)
 
 (*<*)
 theory MipsTLBReplacementHandlerDeter
@@ -207,7 +210,7 @@ proof -
   
   from  inoteq ibound inrange inst have nomatch:
     "\<And>i.  EntryASIDMatch (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) i) = False"
-    by(auto simp add:EntryASIDMatch_def MipsTLBPT_is_instance_def MIPSPT_asid_is 
+    by(auto simp add:EntryASIDMatch_def MipsTLBPT_is_instance_def MIPSPT_TLBENTRY_asid_is 
                      MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
   
   from  inoteq ibound inrange inst nomatch 
@@ -243,7 +246,7 @@ proof -
   
   from inrange inrange2 X3 have X5: 
       "\<And>vpn as. TLBENTRYWellFormed ( MIPSPT_mk_tlbentry (pte mpt) as vpn) "      
-      by(simp add:MIPSPT_TLBENTRYWellFormed)
+      by(simp add:MIPSPT_TLBENTRY_wellformed)
       
   from inrange X3 X0 X5 have X4: "\<And>vpn as. \<forall>i<(capacity (tlb mpt)).
         TLBEntryWellFormed (tlb (MipsTLBPT_update_tlb mpt as vpn)) i"
@@ -269,7 +272,7 @@ proof -
     
     with inrange A1 A0 X0 X3 show "\<And>vpn as. \<forall>i<(capacity (tlb mpt)).
         TLBEntryWellFormed (tlb (MipsTLBPT_update_tlb mpt as vpn)) i"
-      by(auto simp:MIPSPT_TLBENTRYWellFormed TLBValid_def TLBEntryWellFormed_def MIPSTLBIndex_in_range)
+      by(auto simp:MIPSPT_TLBENTRY_wellformed TLBValid_def TLBEntryWellFormed_def MIPSTLBIndex_in_range)
   qed
       
   from X0 X1 X4 have X6: 
