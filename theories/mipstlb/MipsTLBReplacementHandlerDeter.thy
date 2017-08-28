@@ -35,15 +35,18 @@ theory MipsTLBReplacementHandlerDeter
 begin
 (*>*)
 
-text "This is the deterministic version of the MIPS TLB + Replacement handler"  
+text "This model is a deterministic version of a TLB + exceptin handler for
+      the MIPS R4600 TLB model. In this model, each page table entry for a
+      particular VPN will always be present int the very same entry in the
+      TLB, if at all. "  
   
 
 (* ========================================================================= *)  
 section "MIPS TLB + MIPS PageTables"
 (* ========================================================================= *)    
   
-text "We now define the combination of a MIPS TLB and a MIPS PageTable. Note
-      that the MIPSPT stores the ASID."
+text "We now define the combination of a MIPS TLB and a MIPS PageTable. All
+      entries of the TLB will be populated based on the page table."
   
 record MipsTLBPT = 
   tlb :: MIPSTLB
@@ -55,35 +58,49 @@ record MipsTLBPT =
 section "Deterministic Exception Handler"
 (* ========================================================================= *)
   
-text "The MIPS TLB exception handler replaces an entry of the TLB with 
-      the contents of the page table. We provide two different implementations"  
-                                   
-(* ------------------------------------------------------------------------- *)   
-subsection "Deterministic Exception Handler"  
-(* ------------------------------------------------------------------------- *)    
+text "This MIPS TLB exception handler replaces an entry of the TLB with 
+      the contents of the page table in a deterministic fashion, i.e.
+      for each VPN the entry to be replaced will always be the same. For
+      this we defined first a TLB index function."
 
-text "We can formulate a deterministic replacement policy where we always
-      replace the entry based on its VPN2 modulo the TLB capacity."
+  
+(* ------------------------------------------------------------------------- *)   
+subsection "TLB Index calculation"  
+(* ------------------------------------------------------------------------- *)  
+  
+  
+text "We define the following function that takes a TLB entry and a TLB and
+      produces an natural number, i.e. the index of the entry in the TLB. For
+      this we use a simple hash function from the VPN2 of the entry modulo
+      the TLB capacity."
 
 definition MIPSTLBIndex :: "MIPSTLB \<Rightarrow> TLBENTRY \<Rightarrow> nat"
-  where "MIPSTLBIndex t e = ((vpn2 (hi (e))) mod (capacity t))"
+  where "MIPSTLBIndex t e = ((vpn2 (hi (e))) mod (capacity t))"  
 
-    
-text "The calculated index is always in the valid range."
+ 
+text "The definition above will always produce a TLB Index which is within the
+      valid range of the TLB i.e. does not exceed it's capacity."
 
 lemma MIPSTLBIndex_in_range:
   "\<forall>e.  (capacity t) > 0 \<Longrightarrow>  MIPSTLBIndex t e <  (capacity t)"
   by(auto simp:MIPSTLBIndex_def)
-    
-    
-text "If the indexes are different this implies that the two entries are not
-     the same."
+
+
+text "Moreover, this definition of the index calculation gives us that if the 
+      calculated indexes are different this implies that the two entries are not
+      the same."
+
   
 lemma "\<And>e f. MIPSTLBIndex t e \<noteq> MIPSTLBIndex t f \<Longrightarrow> ((vpn2 (hi e)) \<noteq> (vpn2 (hi f)))"
   by(auto simp add:MIPSTLBIndex_def)
 
 lemma "\<And>e f. MIPSTLBIndex t e \<noteq> MIPSTLBIndex t f \<Longrightarrow> e \<noteq> f"
-  by(auto simp add:MIPSTLBIndex_def)
+  by(auto simp add:MIPSTLBIndex_def)    
+
+    
+(* ------------------------------------------------------------------------- *)   
+subsection "Deterministic Exception Handler"  
+(* ------------------------------------------------------------------------- *)    
     
     
 text "We define the deterministic exception handler as follows."
