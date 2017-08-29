@@ -36,15 +36,17 @@ theory MipsTLBReplacementHandler
 begin
 (*>*)
 
-text "This is the NON-deterministic version of the MIPS TLB + Replacement handler"
+text "This is a non-deterministic model of a TLB with replacement handler
+      for the MIPS R4600 TLB model."
 
   
 (* ========================================================================= *)  
 section "MIPS TLB + MIPS PageTables"
 (* ========================================================================= *)    
   
-text "We now define the combination of a MIPS TLB and a MIPS PageTable. Note
-      that the MIPSPT stores the ASID."
+text "We define the the TLB + page table combinations as a record of a TLB
+      instance and a page table instance where the TLB entries will always 
+      be filled based on the entries of the page table."
   
 record MipsTLBPT = 
   tlb :: MIPSTLB
@@ -56,8 +58,11 @@ record MipsTLBPT =
 section "Non-deterministic Exception Handler"
 (* ========================================================================= *)
   
-text "The MIPS TLB exception handler replaces an entry of the TLB with 
-      the contents of the page table."  
+text "The non-deterministic replacement handler uses the random write function
+      of the TLB to non-deterministically replace an existing entry with the
+      new one. Note, that this definition alone won't preserve the validity
+      constraints of the TLB as defined in the TLBValid predicate, in
+      particular, when its being invoked with the same ASID and VPN twice."  
             
   
 definition MipsTLBPT_update_tlb :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> MipsTLBPT set"
@@ -65,56 +70,15 @@ definition MipsTLBPT_update_tlb :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> V
           {\<lparr>tlb = t, pte = (pte mpt)\<rparr> | 
             t. t\<in> tlbwr (MIPSPT_mk_tlbentry (pte mpt) as vpn) (tlb mpt)}"
 
-    
-(* ========================================================================= *)  
-section "Valid TLB+PageTables"
-(* ========================================================================= *) 
 
-  
-text "We say that the combination is valid, if both the TLB and the page table
-     are valid. In addition, the TLB is an instance of the page table if there
-     is a corresponding entry in the page table for all entries in the TLB with
-     a matching ASID. In addition, the deterministic replacement handler
-     ensures a particular location for the entry."  
-  
-    
-definition MipsTLBPT_is_instance2 :: "MipsTLBPT \<Rightarrow> bool"
-  where "MipsTLBPT_is_instance2 mt = (\<forall>i <  (capacity (tlb mt)). 
-        MIPSPT_read (TLBENTRYHI.asid (hi (entries (tlb mt) i))) 
-                    (vpn2 (hi (entries (tlb mt) i)))
-                    (pte mt)       = (lo0(entries (tlb mt) i)) \<and> 
-        MIPSPT_read (TLBENTRYHI.asid (hi (entries (tlb mt) i)))
-                    (vpn2 (hi (entries (tlb mt) i)) + 1) 
-                    (pte mt) = (lo1(entries (tlb mt) i)))"
-    
-definition MipsTLBPT_is_instance ::  "MipsTLBPT \<Rightarrow> bool"
-  where "MipsTLBPT_is_instance mt = (\<forall>i <  (capacity (tlb mt)).
-        entries (tlb mt) i = MIPSPT_mk_tlbentry (pte mt) (asid (hi (entries (tlb mt) i) ))  
-                                                         (vpn2 (hi (entries (tlb mt) i) )))"
-
-
-  
-text "We therefore can define the validity of a MIPS TLB + PageTable combination
-      as the page tables and the TLB are valid and the TLB is an instance of
-      the page tables."
-  
-definition MipsTLBPT_valid :: "MipsTLBPT \<Rightarrow> bool"
-  where "MipsTLBPT_valid mt = ((MIPSPT_valid (pte mt)) \<and> (TLBValid (tlb mt)) 
-                              \<and> (MipsTLBPT_is_instance mt) )"   
-
- 
 (* ========================================================================= *)  
 section "Fault Function"
 (* ========================================================================= *)                                     
 
-text "The fault function ensures that an entry is only updatd if there was no
-      translating function"  
-  
-definition MipsTLBPT_fault2 :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> MipsTLBPT set"
-  where "MipsTLBPT_fault2  mtlb as vpn = 
-      (if MIPSTLB_translate (tlb mtlb) vpn as  = {} then 
-          MipsTLBPT_update_tlb mtlb as vpn
-      else {mtlb})"      
+text "While the update function purely updates the entry, the definition of the
+      fault function effectively simulates a translate attempt and invokes
+      the update function when a refill exception occurs. If an entry is 
+      present, then the state of the TLB is not changed. "
     
 definition MipsTLBPT_fault :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> MipsTLBPT set"
   where "MipsTLBPT_fault  mtlb as vpn = 
@@ -122,157 +86,85 @@ definition MipsTLBPT_fault :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> VPN \<
           MipsTLBPT_update_tlb mtlb as vpn
       else {mtlb})"      
     
+
+text "Therefore we can proof that if the TLB does not throw the refill 
+      exception, the faulting function won't change the state of the TLB
+      i.e. the input MipsTLBPT is the same as the output."
     
-lemma "\<forall>vpn as. MIPSTLB_try_translate (tlb m) as vpn \<noteq> EXNREFILL \<Longrightarrow>
+lemma MipsTLBPT_fault_no_change:
+  "\<forall>vpn as. MIPSTLB_try_translate (tlb m) as vpn \<noteq> EXNREFILL \<Longrightarrow>
             (\<forall>m2 \<in> MipsTLBPT_fault m as vpn. m = m2)"
   by(simp add: MipsTLBPT_fault_def)
+    
+ 
+    
+(* ========================================================================= *)  
+section "Valid TLB and page tables"
+(* ========================================================================= *) 
+
+  
+text "We say that the combination of a TLB and page tables is valid if both, 
+      the TLB and the page table are valid and additionally, the TLB must be
+      an instance of the page table."  
+  
+(* ------------------------------------------------------------------------- *)  
+subsection "Instance"
+(* ------------------------------------------------------------------------- *)
+
+text "A TLB is an instance of a page table if for all entries in the TLB there
+      is a corresponding, equal entry in the page table. In other words, the
+      entry of the TLB must be equal to a created entry from the page table
+      using the very same VPN and ASID."
         
+definition MipsTLBPT_is_instance ::  "MipsTLBPT \<Rightarrow> bool"
+  where "MipsTLBPT_is_instance mt = 
+    (\<forall>i <  (capacity (tlb mt)).  entries (tlb mt) i = 
+        MIPSPT_mk_tlbentry (pte mt) (asid (hi (entries (tlb mt) i) ))  
+                                    (vpn2 (hi (entries (tlb mt) i) )))"
+
+    
+(* ------------------------------------------------------------------------- *)  
+subsection "Validity"
+(* ------------------------------------------------------------------------- *)
+  
+text "We therefore can define the validity of a  TLB + PageTable combination
+      as the logic and of the validity of the page tables and the TLB
+      independently, and together with the instance definition from above."
+  
+definition MipsTLBPT_valid :: "MipsTLBPT \<Rightarrow> bool"
+  where "MipsTLBPT_valid mt = ((MIPSPT_valid (pte mt)) 
+                              \<and> (TLBValid (tlb mt)) 
+                              \<and> (MipsTLBPT_is_instance mt) )"   
+
+ 
+
+        
+
+(* ========================================================================= *)  
+section "Translate Function"
+(* ========================================================================= *)    
+
+text "The translation function first faults on the TLB. This has the effect that
+      if the entry is not present, it gets placed in the TLB. Then the translate
+      attempt is made, which results in an empty set if the entry was not valid."
+       
+  
+definition MipsTLBPT_translate :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> PFN set"
+  where "MipsTLBPT_translate  mtlb as vpn = 
+    \<Union>{ MIPSTLB_translate (tlb m) as vpn | m . m \<in> MipsTLBPT_fault mtlb as vpn}"
+
+    
+lemma 
+  assumes valid : "MipsTLBPT_valid mtlb"
+  shows "MipsTLBPT_translate mtlb as vpn = MIPSPT_translate (pte mtlb) as vpn"
+ oops
 
 
 (* ========================================================================= *)  
 section "Translate Function"
 (* ========================================================================= *)    
 
-text "The Translate function checks whether the VPN can be translated using the
-      TLB, if not the exception handler is invoked and the tried again."  
-       
   
-definition MipsTLBPT_translate :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> PFN set"
-  where "MipsTLBPT_translate  mtlb as vpn = 
-      \<Union>{ MIPSTLB_translate (tlb m) as vpn | m . m \<in> MipsTLBPT_fault mtlb as vpn}"
-
-    
-
-  
-  
-(* ========================================================================= *)  
-section "Proofs"
-(* ========================================================================= *)    
-
-text "Next we proof that if the state of the MIPSTLB and page tables is valid
-      then handling an exception will always results in a valid state again."  
-
-lemma MipsTLBT_keeps_instance: 
- assumes valid: " MipsTLBPT_valid mpt "
-    and inrange: "vpn < MIPSPT_EntriesMax"
-    and inrange2: " ASIDValid as"
-  shows "\<forall>m \<in> (MipsTLBPT_fault mpt as vpn).  MipsTLBPT_is_instance m" 
-proof cases
-  assume nfault: "MIPSTLB_try_translate (tlb mpt) as vpn = EXNREFILL"
-  then show ?thesis 
-  proof -
-    from valid have isinstance:
-      "MipsTLBPT_is_instance mpt"
-      by(simp add:MipsTLBPT_valid_def)
-        
-        
-    have  Z1: "(\<And>m i. i <  (capacity (tlb mpt)) \<Longrightarrow>
-           (m = \<lparr>tlb = \<lparr>capacity = capacity (tlb mpt), 
-                   wired = wired (tlb mpt), 
-                   entries = (entries (tlb mpt))(i := MIPSPT_mk_tlbentry (pte mpt) as vpn) \<rparr>,
-                  pte = (pte mpt) \<rparr> ) 
-        \<Longrightarrow> ((entries (tlb m) i = MIPSPT_mk_tlbentry (pte m) (asid (hi (entries (tlb m) i) ))  
-                                                           (vpn2 (hi (entries (tlb m) i) ))))
-
-)"
-      by(auto simp add:MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
-      
-    from nfault have X0:  "(\<forall>m \<in> (MipsTLBPT_fault mpt as vpn).  MipsTLBPT_is_instance m) =
-                      (\<forall>m \<in> MipsTLBPT_update_tlb mpt as vpn .  MipsTLBPT_is_instance m)"
-      by(simp add:MipsTLBPT_fault_def)
-    
-    have X1:  " ... = (\<forall>m\<in>{\<lparr>tlb = t, pte = pte mpt\<rparr> |t. t \<in> tlbwr (MIPSPT_mk_tlbentry (pte mpt) as vpn) (tlb mpt)}. MipsTLBPT_is_instance m)"
-      by(simp only:MipsTLBPT_update_tlb_def)
-    
-    have X2:  " ... = (\<forall>m\<in>{\<lparr>tlb = t, pte = pte mpt\<rparr> |t.
-                  t \<in> {t2 | t2 i. t2= \<lparr>capacity = capacity (tlb mpt), 
-                                       wired = wired (tlb mpt), 
-                                       entries = (entries (tlb mpt))(i := MIPSPT_mk_tlbentry (pte mpt) as vpn)\<rparr> \<and>
-                            i \<in> RandomIndexRange (tlb mpt)}}.
-        MipsTLBPT_is_instance m)"
-      by(auto simp add:tlbwr_def)
-        
-    have X3:  " ... = (\<forall>i \<in> RandomIndexRange (tlb mpt). MipsTLBPT_is_instance (\<lparr>tlb = \<lparr>capacity = capacity (tlb mpt), 
-                                       wired = wired (tlb mpt), 
-                                       entries = (entries (tlb mpt))(i := MIPSPT_mk_tlbentry (pte mpt) as vpn)\<rparr>, pte = pte mpt\<rparr>))"
-      by(auto)
-        
-        
-    from isinstance X0 X1 X2 X3 Z1 show ?thesis 
-        by(auto simp add:MipsTLBPT_is_instance_def)
-
-  qed
-next
- assume nfault: "MIPSTLB_try_translate (tlb mpt) as vpn \<noteq> EXNREFILL"
-  then show ?thesis 
-  proof -
-    from valid have isinstance:
-      "MipsTLBPT_is_instance mpt"
-      by(simp add:MipsTLBPT_valid_def)
-    
-    from nfault have X1: "\<forall>m \<in> (MipsTLBPT_fault mpt as vpn). m = mpt"
-      by(simp add:MipsTLBPT_fault_def)
-    
-    from isinstance X1 show ?thesis 
-      by(auto)       
-  qed   
-qed 
-
-  
-  
-
-lemma MipsTLBT_keeps_ptvalid:
-  "\<And>vpn mpt as. MipsTLBPT_valid mpt \<Longrightarrow> vpn < MIPSPT_EntriesMax 
-           \<Longrightarrow> \<forall>m \<in> MipsTLBPT_fault mpt as vpn .  MIPSPT_valid (pte m)"       
-  by(simp add:MipsTLBPT_valid_def MipsTLBPT_update_tlb_def MipsTLBPT_fault_def, auto)
-
-    
-lemma MipsTLBT_keeps_TLBValid :
-  assumes valid: "MipsTLBPT_valid mpt "
-    and inrange: "\<And>vpn. vpn < MIPSPT_EntriesMax"
-    and inrange2: "\<And>as. ASIDValid as"
-      shows "\<And>vpn as.  \<forall>m \<in> MipsTLBPT_fault mpt as vpn .  TLBValid (tlb m)"
-proof -
-  from valid have X0: "TLBValid (tlb mpt)" 
-    by(auto simp add:MipsTLBPT_valid_def)
-  
-  from X0 have alleven: "\<forall>i < (capacity (tlb mpt)). even (vpn2 (hi (entries (tlb mpt) i)))"
-    by(simp add:TLBValid_def TLBEntryWellFormed_def TLBENTRYWellFormed_def TLBENTRYHIWellFormed_def 
-                VPN2Valid_def)
-  
-  also have X1: "\<And>vpn as.  \<forall>m \<in> MipsTLBPT_update_tlb mpt as vpn . (wired (tlb m)) =  (wired (tlb mpt)) "
-    by(simp add:MipsTLBPT_update_tlb_def tlbwr_def, auto)
-
-  from valid have X2: "MipsTLBPT_is_instance mpt"
-    by(auto simp:MipsTLBPT_valid_def)
-      
-  from valid have X3: " MIPSPT_valid (pte mpt)" 
-    by(auto simp:MipsTLBPT_valid_def)
-  
-  from inrange inrange2 X3 have X5: 
-      "\<And>vpn as. TLBENTRYWellFormed ( MIPSPT_mk_tlbentry (pte mpt) as vpn) "      
-      by(simp add:MIPSPT_TLBENTRY_wellformed)
-        
-  from inrange X3 X0 X5 have X4: "\<And>vpn as. \<forall>i<(capacity (tlb mpt)).
-       \<forall>m \<in> MipsTLBPT_update_tlb mpt as vpn . TLBEntryWellFormed (tlb (m)) i"
-    by(simp add:MipsTLBPT_update_tlb_def, auto)
-  
-  from valid inrange inrange2 alleven X0 X2 X3 X4 X5 
-  show "\<And>vpn as.  \<forall>m \<in> MipsTLBPT_fault mpt as vpn .  TLBValid (tlb m)"
-    by(simp add:MipsTLBPT_fault_def TLBValid_def, auto)
-qed
-  
-lemma MipsTLBPT_keeps_valid :
-    assumes valid: "\<And>mpt. MipsTLBPT_valid mpt "
-    and inrange: "\<And>vpn. vpn < MIPSPT_EntriesMax"
-    and inrange2: "\<And>as. ASIDValid as"
-  shows "\<And>vpn mpt as.  \<forall>m \<in> MipsTLBPT_fault mpt as vpn .  MipsTLBPT_valid m"
-  apply(subst MipsTLBPT_valid_def)
-  apply(simp add:ball_conj_distrib)
-  apply(simp add:MipsTLBT_keeps_ptvalid valid inrange inrange2 )
-  apply(simp add:MipsTLBT_keeps_instance valid inrange inrange2)
-  apply(simp add:MipsTLBT_keeps_TLBValid valid inrange inrange2 )
-  done
 
 lemma MipsTLBPT_instance_no_global:
   assumes  valid: "MipsTLBPT_valid m"
@@ -315,6 +207,287 @@ proof -
     by(auto)
 qed
       
+
+  
+   
+(* ========================================================================= *)  
+section "Faulting keeps Validity"
+(* ========================================================================= *)    
+
+text "Next we proof that whenever the validity condition holds and the ASID/VPN
+      are in the valid ranges then the fault function will result in a valid state.
+      For this purpose we split up the proof into the three conditions and in the
+      end use the lemmas to prove the validity."  
+
+(* ------------------------------------------------------------------------- *)   
+subsection "Instance Preservation"  
+(* ------------------------------------------------------------------------- *)     
+   
+text "We now show that the fault function will preserve the instance condition
+     of the TLB. For this we split up the proof into two cases, one where the 
+     entry is not present (i.e. refill exception condition) and one where the
+     TLB has the entry."
+
+lemma MipsTLBT_keeps_instance: 
+assumes valid: " MipsTLBPT_valid mpt "
+    and inrange: "vpn < MIPSPT_EntriesMax"
+    and inrange2: " ASIDValid as"
+  shows "\<forall>m \<in> (MipsTLBPT_fault mpt as vpn).  MipsTLBPT_is_instance m" 
+proof cases
+  assume nfault: "MIPSTLB_try_translate (tlb mpt) as vpn = EXNREFILL"
+  then show ?thesis 
+  proof -
+    from valid have isinstance:
+      "MipsTLBPT_is_instance mpt"
+      by(simp add:MipsTLBPT_valid_def)
+        
+    have Z1: 
+      "(\<And>m i. i <  (capacity (tlb mpt)) \<Longrightarrow>
+       m = \<lparr>
+        tlb = \<lparr>
+          capacity = capacity (tlb mpt), 
+          wired = wired (tlb mpt), 
+          entries = 
+            (entries (tlb mpt))(i := MIPSPT_mk_tlbentry (pte mpt) as vpn) \<rparr>,
+        pte = (pte mpt) \<rparr>   \<Longrightarrow> 
+      ((entries (tlb m) i = 
+          MIPSPT_mk_tlbentry (pte m) (asid (hi (entries (tlb m) i)))  
+                                     (vpn2 (hi (entries (tlb m) i) )))))"
+      by(auto simp add:MIPSPT_mk_tlbentry_def TLBENTRY.make_def)
+      
+    from nfault have X0:  
+      "(\<forall>m \<in> (MipsTLBPT_fault mpt as vpn).  MipsTLBPT_is_instance m) =
+             (\<forall>m \<in> MipsTLBPT_update_tlb mpt as vpn .  MipsTLBPT_is_instance m)"
+      by(simp add:MipsTLBPT_fault_def)
+    
+    have X1:  
+      "... = (\<forall>m\<in>{\<lparr>tlb = t, pte = pte mpt\<rparr> |t. 
+          t \<in> tlbwr (MIPSPT_mk_tlbentry (pte mpt) as vpn) (tlb mpt)}. 
+              MipsTLBPT_is_instance m)"
+      by(simp only:MipsTLBPT_update_tlb_def)
+    
+    have X2:  
+      "... = (\<forall>m\<in>{\<lparr>tlb = t, pte = pte mpt\<rparr> |t.
+         t \<in> {t2 | t2 i. t2= \<lparr>
+           capacity = capacity (tlb mpt), 
+           wired = wired (tlb mpt), 
+           entries = 
+            (entries (tlb mpt))(i := MIPSPT_mk_tlbentry (pte mpt) as vpn)\<rparr> \<and>
+             i \<in> RandomIndexRange (tlb mpt)}}.
+        MipsTLBPT_is_instance m)"
+      by(auto simp add:tlbwr_def)
+        
+    have X3:  
+      "... = (\<forall>i \<in> RandomIndexRange (tlb mpt). 
+        MipsTLBPT_is_instance (\<lparr>
+         tlb = \<lparr>
+          capacity = capacity (tlb mpt), 
+          wired = wired (tlb mpt), 
+          entries = 
+            (entries (tlb mpt))(i := MIPSPT_mk_tlbentry (pte mpt) as vpn)\<rparr>, 
+         pte = pte mpt\<rparr>))"
+      by(auto)
+               
+    from isinstance X0 X1 X2 X3 Z1 show ?thesis 
+        by(auto simp add:MipsTLBPT_is_instance_def)
+  qed
+next
+ assume nfault: "MIPSTLB_try_translate (tlb mpt) as vpn \<noteq> EXNREFILL"
+  then show ?thesis 
+  proof -
+    from valid have isinstance:
+      "MipsTLBPT_is_instance mpt"
+      by(simp add:MipsTLBPT_valid_def)
+    
+    from nfault have X1: "\<forall>m \<in> (MipsTLBPT_fault mpt as vpn). m = mpt"
+      by(simp add:MipsTLBPT_fault_def)
+    
+    from isinstance X1 show ?thesis 
+      by(auto)       
+  qed   
+qed 
+
+    
+(* ------------------------------------------------------------------------- *)   
+subsection "TLB Valid Preservation"  
+(* ------------------------------------------------------------------------- *)         
+
+text "The next step is to proof that the validity of the TLB is preserved when
+      the fault function replaces an entry."  
+
+lemma MipsTLBT_EntryMatchVPN_EntryMatchV :
+assumes valid: "MipsTLBPT_valid mpt "
+    and inrange: "i<capacity (tlb mpt)"
+    and match: "(EntryVPNMatch (entries (tlb mpt) i) (MIPSPT_mk_tlbentry (pte mpt) as vpn))"
+  shows "(EntryVPNMatchV vpn (entries (tlb mpt) i))"
+proof -
+    from valid inrange have vpn2even:
+      "even (vpn2 (hi (entries (tlb mpt) i)))"
+      by(simp add:MipsTLBPT_valid_def TLBValid_def TLBEntryWellFormed_def 
+                     TLBENTRYWellFormed_def TLBENTRYHIWellFormed_def VPN2Valid_def)
+                   
+    have vpn2eve2 : "even (vpn2 (hi  (MIPSPT_mk_tlbentry (pte mpt) as vpn)))"
+      by(simp add:MIPSPT_TLBENTRY_vpn2_even)
+                   
+    from valid inrange have mask4k:
+      "(mask (entries (tlb mpt) i )) = MASK4K"
+      by(simp add:MipsTLBPT_instance_entry_is_4k)
+      
+    from match have X0:
+    "(EntryVPNMatch  (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) i))"
+      by(simp add:EntryVPNMatch_commute)
+    
+    have X1: "(vpn2 (hi (MIPSPT_mk_tlbentry (pte mpt) as vpn))) = (if (even vpn) then vpn else (vpn -1 ))"
+      by(simp add:MIPSPT_TLBENTRY_vpn2_is)
+
+    from X0 mask4k vpn2even vpn2eve2  have X2: 
+      "EntryVPNMatchV (vpn2 (hi  (MIPSPT_mk_tlbentry (pte mpt) as vpn)))  (entries (tlb mpt) i)"
+      by(simp add:EntryVPNMatch_alter MIPSPT_TLBENTRY_mask_is)       
+        
+    from X1 X2 have X3:
+      "EntryVPNMatchV  (if (even vpn) then vpn else (vpn -1 )) (entries (tlb mpt) i)"
+      by(auto)
+
+    from vpn2even mask4k X3 have X4: 
+      "EntryVPNMatchV  (if (even vpn) then vpn else (vpn -1 )) (entries (tlb mpt) i)"
+      by(simp add:EntryVPNMatchV_equals_odd)        
+        
+    from vpn2even mask4k X4 X3 show ?thesis 
+       by(cases "even vpn", simp, simp add:EntryVPNMatchV_equals_odd)
+qed
+
+
+  
+    
+lemma MipsTLBT_no_EntryMatch :
+  assumes valid: "MipsTLBPT_valid mpt "
+     and  inrange: "i<capacity (tlb mpt)"
+     and nomatch :" \<not>EntryMatchVPNASID vpn as (entries (tlb mpt) i)"
+   shows "\<not> (EntryVPNMatch (entries (tlb mpt) i) (MIPSPT_mk_tlbentry (pte mpt) as vpn) \<and> EntryASIDMatch (entries (tlb mpt) i) (MIPSPT_mk_tlbentry (pte mpt) as vpn))"
+proof cases
+  assume vpnmatch : "(EntryVPNMatch (entries (tlb mpt) i) (MIPSPT_mk_tlbentry (pte mpt) as vpn))"
+  then show ?thesis
+  proof -
+    from vpnmatch valid inrange have X1: "(EntryVPNMatchV vpn (entries (tlb mpt) i))"
+      by(simp add:MipsTLBT_EntryMatchVPN_EntryMatchV)
+     
+    from valid have ptvalid : "MIPSPT_valid (pte mpt)"
+      by(simp add:MipsTLBPT_valid_def)
+        
+    from nomatch X1 have X0 :
+      "\<not> EntryASIDMatchA as (entries (tlb mpt) i)"
+      by(simp add:EntryMatchVPNASID_def)
+    
+    from valid inrange X0 ptvalid have X2: "\<not>EntryASIDMatch (entries (tlb mpt) i) (MIPSPT_mk_tlbentry (pte mpt) as vpn)"
+      by(simp add:EntryASIDMatch_def MipsTLBPT_instance_no_global MIPSPT_TLBENTRY_not_global
+                     MIPSPT_TLBENTRY_asid_is EntryASIDMatchA_def)
+
+    thus ?thesis 
+      by(auto)        
+  qed
+next
+  assume novpnmatch : "\<not>(EntryVPNMatch (entries (tlb mpt) i) (MIPSPT_mk_tlbentry (pte mpt) as vpn))"
+  then show ?thesis
+    by(auto)
+qed
+  
+lemma MipsTLBT_keeps_TLBValid :
+assumes valid: "MipsTLBPT_valid mpt "
+    and inrange: "vpn < MIPSPT_EntriesMax"
+    and inrange2: "ASIDValid as"
+  shows "\<forall>m \<in> MipsTLBPT_fault mpt as vpn . TLBValid (tlb m)"
+proof cases
+  assume fault: "MIPSTLB_try_translate (tlb mpt) as vpn = EXNREFILL"
+  then show ?thesis
+  proof -  
+  from fault have X0:
+    "MipsTLBPT_fault mpt as vpn =  
+        {\<lparr>tlb = t, pte = pte mpt\<rparr> |t. 
+         t \<in> tlbwr (MIPSPT_mk_tlbentry (pte mpt) as vpn) (tlb mpt)}"
+    by(simp add:MipsTLBPT_fault_def MipsTLBPT_update_tlb_def)
+         
+  from valid have tlbvalid: 
+    "TLBValid (tlb mpt)" 
+    by(auto simp add:MipsTLBPT_valid_def)
+  
+  from valid have ptvalid :
+    "MIPSPT_valid (pte mpt)"
+   by(auto simp add:MipsTLBPT_valid_def)
+      
+  from inrange inrange2 ptvalid have wf:
+    "TLBENTRYWellFormed (MIPSPT_mk_tlbentry (pte mpt) as vpn)"
+    by(simp add:MIPSPT_TLBENTRY_wellformed )
+  
+  from fault have nomatch :
+    "(\<forall>i<capacity (tlb mpt). \<not>EntryMatchVPNASID vpn as (entries (tlb mpt) i))"
+    by(simp add:MIPSTLB_fault_no_match)
+
+  from nomatch ptvalid valid have X1:
+    "(\<forall>i<capacity (tlb mpt).
+     \<not> (EntryVPNMatch (entries (tlb mpt) i) (MIPSPT_mk_tlbentry (pte mpt) as vpn) \<and> EntryASIDMatch (entries (tlb mpt) i) (MIPSPT_mk_tlbentry (pte mpt) as vpn)))"
+    by(auto simp:MipsTLBT_no_EntryMatch)
+    
+  from ptvalid nomatch X1 have nc:
+    "TLBEntryNoConflict (MIPSPT_mk_tlbentry (pte mpt) as vpn) (tlb mpt)" 
+    by(auto simp add:TLBEntryNoConflict_def EntryMatch_def)
+      
+  from tlbvalid wf nc X0 show ?thesis
+    by(auto simp:TLBRandomUpdateValid)
+  qed    
+next
+  assume nfault: "MIPSTLB_try_translate (tlb mpt) as vpn \<noteq> EXNREFILL"
+  then show ?thesis 
+  proof -
+    from nfault have X0:
+       "MipsTLBPT_fault mpt as vpn = {mpt}"
+      by(simp add:MipsTLBPT_fault_def)
+    
+    from valid have tlbvalid:
+      "TLBValid (tlb mpt)"
+      by(simp add:MipsTLBPT_valid_def)
+    
+    from X0 tlbvalid show ?thesis 
+      by(auto)
+  qed  
+qed
+  
+
+
+
+(* ------------------------------------------------------------------------- *)   
+subsection "Page Table Valid Preservation"  
+(* ------------------------------------------------------------------------- *)       
+
+text "Lastly, we show that the fault function preserves the validity of the
+      page table which is trivial given the page tables are not changed."
+
+lemma MipsTLBT_keeps_ptvalid:
+  "\<And>vpn mpt as. MipsTLBPT_valid mpt \<Longrightarrow> vpn < MIPSPT_EntriesMax 
+           \<Longrightarrow> \<forall>m \<in> MipsTLBPT_fault mpt as vpn .  MIPSPT_valid (pte m)"       
+  by(simp add:MipsTLBPT_valid_def MipsTLBPT_update_tlb_def MipsTLBPT_fault_def, 
+     auto)
+  
+(* ------------------------------------------------------------------------- *)   
+subsection "Validity Preservation"  
+(* ------------------------------------------------------------------------- *)     
+  
+lemma MipsTLBPT_keeps_valid :
+    assumes valid: "\<And>mpt. MipsTLBPT_valid mpt "
+    and inrange: "\<And>vpn. vpn < MIPSPT_EntriesMax"
+    and inrange2: "\<And>as. ASIDValid as"
+  shows "\<And>vpn mpt as.  \<forall>m \<in> MipsTLBPT_fault mpt as vpn .  MipsTLBPT_valid m"
+  apply(subst MipsTLBPT_valid_def)
+  apply(simp add:ball_conj_distrib)
+  apply(simp add:MipsTLBT_keeps_ptvalid valid inrange inrange2 )
+  apply(simp add:MipsTLBT_keeps_instance valid inrange inrange2)
+  apply(simp add:MipsTLBT_keeps_TLBValid valid inrange inrange2 )
+  done
+
+(* ========================================================================= *)  
+section "Proofs"
+(* ========================================================================= *)     
+    
+    
 
 
   
