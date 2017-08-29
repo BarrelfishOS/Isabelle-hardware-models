@@ -1173,12 +1173,159 @@ lemma  EntryVPNMatch_true :
                       page_size_def EntryMaxVA_def EntrySize_def KB_def MB_def)
   apply(auto)
   done     
+    
+lemma EntryVPNMatchV_true:
+  assumes size : "(mask e) = MASK4K"
+  shows  "EntryVPNMatchV (vpn2 (hi e)) e = True"
+  by(simp add:EntryVPNMatchV_def  EntryMax4KVPN_def EntryMin4KVPN_def size)
+  
 
 lemma TLBEntryResetVPN_match :
   "\<And>i j. i = j \<longleftrightarrow> EntryVPNMatch (TLBEntryReset i) (TLBEntryReset j)"
   by(auto simp:EntryVPNMatch_def EntryRange_def EntryMinVA_def
                TLBEntryResetVPN2_is TLBEntryResetMask_is EntryMaxVA_def
                EntrySize_def KB_def) 
+
+             
+lemma EntryVPNMatch_is_vpn2match :
+  assumes size1: "(mask e1) = MASK4K"
+    and size2: "mask e2 = MASK4K"
+    and even1: "(even (vpn2 (hi e1)))"
+    and even2: "(even (vpn2 (hi e2)))"
+  shows "EntryVPNMatch e1 e2 = ((vpn2 (hi e1)) = (vpn2 (hi e2)))"
+proof
+  assume match: "EntryVPNMatch e1 e2"
+  show "vpn2 (hi e1) = vpn2 (hi e2)"
+  proof -
+    from match size1 size2 have X0:
+      "({x. vpn2 (hi e1) * 4096 \<le> x \<and> x \<le> 8191 + vpn2 (hi e1) * 4096} 
+      \<inter> {x. vpn2 (hi e2) * 4096 \<le> x \<and> x \<le> 8191 + vpn2 (hi e2) * 4096} \<noteq> {})"
+      by(simp add:EntryVPNMatch_def EntryRange_def EntryMinVA_def EntryMaxVA_def 
+                  EntrySize_def KB_def)
+        
+    from X0 have X1 : 
+      "({x. (vpn2 (hi e1) * 4096 \<le> x) \<and> (vpn2 (hi e2) * 4096 \<le> x) 
+            \<and> (x < 8192 + vpn2 (hi e1) * 4096) 
+            \<and>  (x \<le> 8191 + vpn2 (hi e2) * 4096)} \<noteq> {})"
+      by(auto)
+        
+    from X1 have X2: 
+      "({x. (vpn2 (hi e1) * 4096 \<le> x) \<and> (vpn2 (hi e2) * 4096 \<le> x) 
+          \<and> (x < (2 + vpn2 (hi e1)) * 4096) \<and>  (x < ( 2 + vpn2 (hi e2)) * 4096)} \<noteq> {})"
+      by(auto)        
+
+
+    from X2 have X3: 
+      "({x. (vpn2 (hi e2) * 4096 \<le> x) \<and> (x < (2 + vpn2 (hi e1)) * 4096)} \<noteq> {})"
+      by(auto)
+    
+    from X2 have X4: 
+      "({x. (vpn2 (hi e1) * 4096 \<le> x) \<and>  (x < ( 2 + vpn2 (hi e2)) * 4096)} \<noteq> {})"
+      by(auto)        
+    
+    from even1 even2 have X5 : "vpn2 (hi e2) \<noteq> Suc (vpn2 (hi e1))"        
+      by(auto)
+    from even1 even2 have X12 : "vpn2 (hi e1) \<noteq> Suc (vpn2 (hi e2))"        
+      by(auto)          
+        
+    from X3 have X6: "vpn2 (hi e2) < 2 + vpn2 (hi e1)"
+      by(auto)
+    from X6 have X7:  "vpn2 (hi e2) \<le> Suc (vpn2 (hi e1))"
+      by(auto)
+    from even1 even2 X5 X7 have X9: "vpn2 (hi e2) \<le> (vpn2 (hi e1))"
+      by(auto)
+        
+    from X4 have X10: "vpn2 (hi e1) < 2 + vpn2 (hi e2)"
+      by(auto)
+    from X10 have X11:  "vpn2 (hi e1) \<le> Suc (vpn2 (hi e2))"
+      by(auto)
+    
+    from even1 even2 X12 X11 have X12: "vpn2 (hi e1) \<le> (vpn2 (hi e2))"
+      by(auto)        
+        
+    from X12 X9 show ?thesis 
+      by(auto)
+  qed
+next
+  assume eq: "vpn2 (hi e1) = vpn2 (hi e2)"
+  show "EntryVPNMatch e1 e2 "
+  proof -
+    from size1 size2 even1 even2 have X0:
+      "EntryVPNMatch e1 e2 = ({x. vpn2 (hi e1) * 4096 \<le> x \<and> x \<le> 8191 + vpn2 (hi e1) * 4096}
+           \<inter> {x. vpn2 (hi e2) * 4096 \<le> x \<and> x \<le> 8191 + vpn2 (hi e2) * 4096} \<noteq> {})"
+      by(simp add:EntryVPNMatch_def EntryRange_def EntryMinVA_def EntryMaxVA_def 
+                  EntrySize_def KB_def)
+    from eq have X1: "... = ({x. vpn2 (hi e1) * 4096 \<le> x \<and> x \<le> 8191 + vpn2 (hi e1) * 4096} 
+          \<inter> {x. vpn2 (hi e1) * 4096 \<le> x \<and> x \<le> 8191 + vpn2 (hi e1) * 4096} \<noteq> {})"
+      by(auto)
+    have X2 : "... = ({x. vpn2 (hi e1) * 4096 \<le> x \<and> x \<le> 8191 + vpn2 (hi e1) * 4096} \<noteq> {})"
+      by(auto)
+    from X0 X1 X2 show ?thesis 
+      by(auto)
+  qed
+qed
+             
+lemma EntryVPNMatch_alter :
+assumes size1: "(mask e1) = MASK4K"
+    and size2: "mask e2 = MASK4K"
+    and even1: "(even (vpn2 (hi e1)))"
+    and even2: "(even (vpn2 (hi e2)))"
+  shows "EntryVPNMatch e1 e2 = EntryVPNMatchV (vpn2 (hi e1)) e2"
+proof cases
+  assume eq: "e1 = e2"
+  then show ?thesis 
+  proof -
+    from eq have X0: "EntryVPNMatch e1 e2" 
+      by(simp add:EntryVPNMatch_true)
+    from eq size1 have X1: "EntryVPNMatchV (vpn2 (hi e1)) e2"
+      by(simp add:EntryVPNMatchV_true)
+    from X0 X1 show ?thesis 
+      by(auto)
+  qed
+next
+  assume neq: "e1 \<noteq> e2"
+  then show ?thesis 
+  proof cases
+    assume match: "EntryVPNMatch e1 e2"
+    then show ?thesis 
+    proof -
+      from match size1 size2 even1 even2 have X0: 
+        "(vpn2 (hi e1)) = (vpn2 (hi e2))"
+        by(simp add:EntryVPNMatch_is_vpn2match)  
+      
+      from match size1 size2 X0 show ?thesis
+        by(simp add:EntryVPNMatchV_def EntryMin4KVPN_def EntryMax4KVPN_def)
+    qed      
+  next
+    assume nomatch: "\<not>EntryVPNMatch e1 e2"
+    then show ?thesis
+    proof -
+      from nomatch size1 size2 even1 even2 have X0: 
+        "(vpn2 (hi e1)) \<noteq>  (vpn2 (hi e2))"
+        by(simp add:EntryVPNMatch_is_vpn2match)  
+       
+      from  size1 size2  have X1:
+        "EntryVPNMatchV (vpn2 (hi e1)) e2 =
+        (vpn2 (hi e2) \<le> vpn2 (hi e1) \<and> vpn2 (hi e1) \<le> Suc (vpn2 (hi e2)))"
+        by(simp add:EntryVPNMatchV_def EntryMin4KVPN_def EntryMax4KVPN_def)
+
+      from X0 even1 even2 have X2:
+        "... = (vpn2 (hi e2) < vpn2 (hi e1) \<and> vpn2 (hi e1) \<le> Suc (vpn2 (hi e2)))"
+        by(auto)
+
+      from even1 even2 have X3 :
+        "vpn2 (hi e1) \<noteq> Suc (vpn2 (hi e2))"
+        by(auto)
+          
+      from X0 X3 even1 even2 have X3:
+        "... = (vpn2 (hi e2) < vpn2 (hi e1) \<and> vpn2 (hi e1) < Suc (vpn2 (hi e2)))"
+        by(auto)
+      
+      from nomatch neq X0 X1 X2 X3 size1 size2 even1 even2 show ?thesis
+        by(auto)
+    qed
+  qed
+qed
   
 
   
@@ -1231,7 +1378,8 @@ proof cases
         by(simp add:ASIDValidSet_notempty)
       have X0: "EntryMatch e1 e2 = (EntryRange e1 \<inter> EntryRange e2 \<noteq> {})" 
         by(simp add:EntryMatch_def EntryVPNMatch_def EntryASIDMatch_def e1g)
-      have X1: "EntryMatchER e1 e2 = (mk_extended_range ASIDValidSet (EntryRange e1) \<inter> mk_extended_range ASIDValidSet (EntryRange e2) \<noteq> {})"
+      have X1: "EntryMatchER e1 e2 = (mk_extended_range ASIDValidSet (EntryRange e1) 
+            \<inter> mk_extended_range ASIDValidSet (EntryRange e2) \<noteq> {})"
         by(simp add:EntryMatchER_def EntryExtendedRange_def e1g e2g)
       hence  X2: "... = (mk_extended_range ASIDValidSet (EntryRange e1 \<inter> EntryRange e2) \<noteq> {})"
         by(simp add:mk_extended_range_addr_inter nz space1 space2)
@@ -1508,6 +1656,9 @@ proof -
   from X1 show ?thesis 
     by(auto)
 qed
+  
+  
+
 
   
 (* ------------------------------------------------------------------------- *)   
@@ -2276,28 +2427,84 @@ text "If the TLB is in a valid state, and the entry to be inserted does not conf
       with any of the existing entries, then the TLBWR operation returns a set of
       valid TLBs"
   
+  
 lemma TLBRandomUpdateValid :
   assumes tlbvalid: "TLBValid tlb"
-    and wf: "\<And>e.  TLBENTRYWellFormed e"
-    and nc: "\<And>e. TLBEntryNoConflict e tlb"
-    and ir: "\<And>idx. idx < (capacity tlb)"
-  shows 
-   "\<And>e. (\<forall>t \<in> (tlbwr e tlb). TLBValid t)"
+    and wf: "TLBENTRYWellFormed e"
+    and nc: "TLBEntryNoConflict e tlb"
+  shows "(\<forall>t \<in> (tlbwr e tlb). TLBValid t)"
 proof -
   
-  have X0: "\<And>e. (\<forall>t \<in> (tlbwr e tlb). TLBValid t) = 
-                (\<forall>i \<in> RandomIndexRange tlb. \<forall>t \<in>  {\<lparr> capacity = (capacity tlb),
+  from nc have NoConflictSet :
+    "\<forall>i < capacity tlb. TLBEntryConflictSet e \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {i}"
+    by(simp add:TLBEntryNoConflict_def TLBEntryConflictSet_def, auto)
+  
+  from nc have nomatch: "\<forall>j<capacity tlb. \<not>EntryMatch e (entries tlb j)"
+    by(simp add:TLBEntryNoConflict_def EntryMatch_commute)      
+  
+  have X0: "(\<forall>t \<in> (tlbwr e tlb). TLBValid t) = 
+             (\<forall>i \<in> RandomIndexRange tlb. \<forall>t \<in>  {\<lparr> capacity = (capacity tlb),
                                   wired = (wired tlb),  
                                   entries = (entries tlb)(i :=  e) \<rparr>}. TLBValid t )"
     by(simp add:tlbwr_def, auto)
     
-  with nc have wr: "\<And>e idx.  TLBEntryWriteable idx e tlb"
-    by(auto simp:NoConflictsImpliesWriteable NoConflictNoConflictSet)
+  from tlbvalid have X1 : " ... =  (\<forall>i\<in>RandomIndexRange tlb.
+        \<forall>t\<in>{\<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr>}.
+            (\<forall>i<capacity t. TLBEntryWellFormed t i \<and> TLBEntryConflictSet (entries t i) t \<subseteq> {i}))"
+    by(simp only:TLBValid_def, auto)
+
   
-  with X0 wr wf nc ir show "\<And>e. (\<forall>t \<in> (tlbwr e tlb). TLBValid t)"
-  by(auto)
-qed
-   
+  have X2 : " ... =  (\<forall>i\<in>RandomIndexRange tlb. \<forall>j<capacity tlb. 
+        \<forall>t\<in>{\<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr>}.
+            (TLBEntryWellFormed t j \<and> TLBEntryConflictSet (entries t j) t \<subseteq> {j}))"
+    by(auto)      
+        
+  have X3: " ... =  (\<forall>i\<in>RandomIndexRange tlb. \<forall>j<capacity tlb. 
+            (TLBEntryWellFormed \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> j 
+          \<and> TLBEntryConflictSet (entries \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> j) \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j}))"
+    by(auto)
+      
+      
+  have X4: " ... = (\<forall>i\<in>RandomIndexRange tlb. \<forall>j<capacity tlb. 
+          (i = j \<longrightarrow>  (TLBEntryWellFormed \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> j 
+          \<and> TLBEntryConflictSet (entries \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> i) \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {i}) ) \<and>
+          (i \<noteq> j \<longrightarrow>   (TLBEntryWellFormed \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> j 
+          \<and> TLBEntryConflictSet (entries \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)\<rparr> j) \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j})))"
+    by(auto)    
+            
+   from wf tlbvalid have X6: " ... =  (\<forall>i\<in>RandomIndexRange tlb.
+        \<forall>j<capacity tlb.
+           (i = j \<longrightarrow> TLBEntryConflictSet e \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {i}) \<and>
+           (i \<noteq> j \<longrightarrow> TLBEntryConflictSet (entries tlb j) \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j}))"
+    by(simp add:TLBEntryWellFormed_def TLBValid_def)
+
+
+  from NoConflictSet have X7 :  " ... =  (\<forall>i\<in>RandomIndexRange tlb.
+        \<forall>j<capacity tlb.
+           (i \<noteq> j \<longrightarrow> TLBEntryConflictSet (entries tlb j) \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j}))"
+    by(auto)
+      
+  have X8: " ... =  (\<forall>i\<in>RandomIndexRange tlb.
+        \<forall>j<capacity tlb.
+           i \<noteq> j \<longrightarrow> {ia. (ia = i \<longrightarrow> i < capacity tlb \<and> EntryMatch e (entries tlb j)) \<and> 
+                          (ia \<noteq> i \<longrightarrow> ia < capacity tlb \<and> EntryMatch (entries tlb ia) (entries tlb j))} \<subseteq> {j})"
+    by(simp add:TLBEntryConflictSet_def)
+  
+  from nomatch have X9: " ... =  (\<forall>i\<in>RandomIndexRange tlb.
+        \<forall>j<capacity tlb.
+           i \<noteq> j \<longrightarrow> {ia. (ia = i \<longrightarrow> False) \<and> 
+                          (ia \<noteq> i \<longrightarrow> ia < capacity tlb \<and> EntryMatch (entries tlb ia) (entries tlb j))} \<subseteq> {j})"
+    by(auto)
+      
+  from tlbvalid have X10: " ... = True"
+    by(simp add:TLBValid_def TLBEntryConflictSet_def, auto)
+
+
+  from wf nomatch NoConflictSet nc tlbvalid X0 X1 X2 X3 X4 X6 X7 X8 X9 X10 show ?thesis 
+    by(auto)
+      
+qed  
+  
 
 (* ========================================================================= *)  
 section "Create a Decoding Net Node"
