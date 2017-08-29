@@ -91,7 +91,8 @@ text "Moreover, this definition of the index calculation gives us that if the
       the same."
 
   
-lemma "\<And>e f. MIPSTLBIndex t e \<noteq> MIPSTLBIndex t f \<Longrightarrow> ((vpn2 (hi e)) \<noteq> (vpn2 (hi f)))"
+lemma "\<And>e f. MIPSTLBIndex t e \<noteq> MIPSTLBIndex t f 
+                  \<Longrightarrow> ((vpn2 (hi e)) \<noteq> (vpn2 (hi f)))"
   by(auto simp add:MIPSTLBIndex_def)
 
 lemma "\<And>e f. MIPSTLBIndex t e \<noteq> MIPSTLBIndex t f \<Longrightarrow> e \<noteq> f"
@@ -102,16 +103,17 @@ lemma "\<And>e f. MIPSTLBIndex t e \<noteq> MIPSTLBIndex t f \<Longrightarrow> e
 subsection "Deterministic Exception Handler"  
 (* ------------------------------------------------------------------------- *)    
     
-    
-text "We define the deterministic exception handler as follows."
+text "Based on the index calculation above we can define the deterministic
+      exception handler.  "
     
 definition MipsTLBPT_update_tlb :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> VPN  \<Rightarrow> MipsTLBPT"
-  where "MipsTLBPT_update_tlb mpt as vpn = 
-         \<lparr>tlb = (\<lparr> capacity = (capacity (tlb mpt)), 
-                  wired = (wired (tlb mpt)), 
-                  entries = (entries (tlb mpt))(
-                    (MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as  vpn) )
-                       :=  MIPSPT_mk_tlbentry (pte mpt) as vpn) \<rparr> ), 
+  where "MipsTLBPT_update_tlb mpt as vpn = \<lparr>
+         tlb = \<lparr> 
+            capacity = (capacity (tlb mpt)), 
+            wired = (wired (tlb mpt)), 
+            entries = (entries (tlb mpt))(
+               (MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn))
+                :=  MIPSPT_mk_tlbentry (pte mpt) as vpn) \<rparr>, 
          pte = (pte mpt)\<rparr>"
 
 
@@ -119,13 +121,20 @@ text "we show that the definition produces the same result as when using the
       tlbwi function, and therefore we can use the simpler, direct
       equivalent."
   
-lemma "(capacity  (tlb mpt)) > 0  \<Longrightarrow> {\<lparr>tlb = t, pte = (pte mpt)\<rparr> | 
-            t. t\<in> tlbwi (MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as  vpn)) 
-           (MIPSPT_mk_tlbentry (pte mpt) as vpn) (tlb mpt)} = {MipsTLBPT_update_tlb mpt as vpn}"    
+lemma MipsTLBPT_update_equivalence:
+  "(capacity  (tlb mpt)) > 0  \<Longrightarrow> 
+    {\<lparr>tlb = t, pte = (pte mpt)\<rparr> | t. 
+       t \<in> tlbwi (MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn))
+                 (MIPSPT_mk_tlbentry (pte mpt) as vpn) (tlb mpt)} 
+     = {MipsTLBPT_update_tlb mpt as vpn}"    
 by(simp add:MipsTLBPT_update_tlb_def tlbwi_def MIPSTLBIndex_def)
 
+  
+text "The TLB update function does not change the capacity of the TLB."
+  
+  
 lemma MipsTLBPT_det_capacity :
-  "(capacity (tlb (MipsTLBPT_update_tlb mpt as vpn))) = (capacity (tlb mpt)) "
+  "(capacity (tlb (MipsTLBPT_update_tlb mpt as vpn))) = (capacity (tlb mpt))"
   by(simp add:MipsTLBPT_update_tlb_def)
   
     
@@ -138,7 +147,7 @@ text "We say that the combination is valid, if both the TLB and the page table
      are valid. In addition, the TLB is an instance of the page table if there
      is a corresponding entry in the page table for all entries in the TLB with
      a matching ASID. In addition, the deterministic replacement handler
-     ensures a particular location for the entry."  
+     ensures a particular location for the entry."
   
     
 definition MipsTLBPT_is_instance :: "MipsTLBPT \<Rightarrow> bool"
@@ -186,7 +195,7 @@ section "Translate Function"
 (* ========================================================================= *)    
 
 text "The Translate function checks whether the VPN can be translated using the
-      TLB, if not the exception handler is invoked and the tried again."  
+      TLB. "  
        
   
 definition MipsTLBPT_translate :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> PFN set"
