@@ -211,7 +211,7 @@ qed
   
    
 (* ========================================================================= *)  
-section "Faulting keeps Validity"
+section "The Fault Function Preserves Validity"
 (* ========================================================================= *)    
 
 text "Next we proof that whenever the validity condition holds and the ASID/VPN
@@ -313,18 +313,32 @@ subsection "TLB Valid Preservation"
 (* ------------------------------------------------------------------------- *)         
 
 text "The next step is to proof that the validity of the TLB is preserved when
-      the fault function replaces an entry."  
+      the fault function replaces an entry. This holds, because the TLB state 
+      is only changed when there was no match, which implies that there are
+      no matching entries. We first proof two helper lemmas and then use them
+      to do the proof of the actual lemma."
 
+  
+(* ------------------------------------------------------------------------- *)   
+subsubsection "Helper Lemmas"  
+(* ------------------------------------------------------------------------- *)
+
+text "We show that if the TLB + page tables are in a valid state and the entry
+      of the TLB matches with the created entry from the page table, then
+      this entry also matches on the VPN that has been used to create it from 
+      the page table."
+  
 lemma MipsTLBT_EntryMatchVPN_EntryMatchV :
 assumes valid: "MipsTLBPT_valid mpt "
-    and inrange: "i<capacity (tlb mpt)"
-    and match: "(EntryVPNMatch (entries (tlb mpt) i) (MIPSPT_mk_tlbentry (pte mpt) as vpn))"
+    and inrange: "i < capacity (tlb mpt)"
+    and match: "(EntryVPNMatch (entries (tlb mpt) i) 
+                               (MIPSPT_mk_tlbentry (pte mpt) as vpn))"
   shows "(EntryVPNMatchV vpn (entries (tlb mpt) i))"
 proof -
     from valid inrange have vpn2even:
       "even (vpn2 (hi (entries (tlb mpt) i)))"
       by(simp add:MipsTLBPT_valid_def TLBValid_def TLBEntryWellFormed_def 
-                     TLBENTRYWellFormed_def TLBENTRYHIWellFormed_def VPN2Valid_def)
+                  TLBENTRYWellFormed_def TLBENTRYHIWellFormed_def VPN2Valid_def)
                    
     have vpn2eve2 : "even (vpn2 (hi  (MIPSPT_mk_tlbentry (pte mpt) as vpn)))"
       by(simp add:MIPSPT_TLBENTRY_vpn2_even)
@@ -334,41 +348,52 @@ proof -
       by(simp add:MipsTLBPT_instance_entry_is_4k)
       
     from match have X0:
-    "(EntryVPNMatch  (MIPSPT_mk_tlbentry (pte mpt) as vpn) (entries (tlb mpt) i))"
+      "(EntryVPNMatch (MIPSPT_mk_tlbentry (pte mpt) as vpn) 
+                      (entries (tlb mpt) i))"
       by(simp add:EntryVPNMatch_commute)
     
-    have X1: "(vpn2 (hi (MIPSPT_mk_tlbentry (pte mpt) as vpn))) = (if (even vpn) then vpn else (vpn -1 ))"
+    have X1: 
+      "(vpn2 (hi (MIPSPT_mk_tlbentry (pte mpt) as vpn))) 
+            = (if (even vpn) then vpn else (vpn -1 ))"
       by(simp add:MIPSPT_TLBENTRY_vpn2_is)
 
     from X0 mask4k vpn2even vpn2eve2  have X2: 
-      "EntryVPNMatchV (vpn2 (hi  (MIPSPT_mk_tlbentry (pte mpt) as vpn)))  (entries (tlb mpt) i)"
+      "EntryVPNMatchV (vpn2 (hi (MIPSPT_mk_tlbentry (pte mpt) as vpn))) 
+                      (entries (tlb mpt) i)"
       by(simp add:EntryVPNMatch_alter MIPSPT_TLBENTRY_mask_is)       
         
     from X1 X2 have X3:
-      "EntryVPNMatchV  (if (even vpn) then vpn else (vpn -1 )) (entries (tlb mpt) i)"
+      "EntryVPNMatchV (if (even vpn) then vpn else (vpn - 1)) 
+                      (entries (tlb mpt) i)"
       by(auto)
 
     from vpn2even mask4k X3 have X4: 
-      "EntryVPNMatchV  (if (even vpn) then vpn else (vpn -1 )) (entries (tlb mpt) i)"
+      "EntryVPNMatchV (if (even vpn) then vpn else (vpn - 1)) 
+                      (entries (tlb mpt) i)"
       by(simp add:EntryVPNMatchV_equals_odd)        
         
     from vpn2even mask4k X4 X3 show ?thesis 
        by(cases "even vpn", simp, simp add:EntryVPNMatchV_equals_odd)
 qed
 
-
-  
+text "Next we show that if an entry does not match on the VPN and ASID then the 
+      created entry does not match on the VPN and ASID at the same time."  
     
 lemma MipsTLBT_no_EntryMatch :
-  assumes valid: "MipsTLBPT_valid mpt "
-     and  inrange: "i<capacity (tlb mpt)"
-     and nomatch :" \<not>EntryMatchVPNASID vpn as (entries (tlb mpt) i)"
-   shows "\<not> (EntryVPNMatch (entries (tlb mpt) i) (MIPSPT_mk_tlbentry (pte mpt) as vpn) \<and> EntryASIDMatch (entries (tlb mpt) i) (MIPSPT_mk_tlbentry (pte mpt) as vpn))"
+assumes valid: "MipsTLBPT_valid mpt "
+    and inrange: "i<capacity (tlb mpt)"
+    and nomatch :" \<not>EntryMatchVPNASID vpn as (entries (tlb mpt) i)"
+  shows "\<not>(EntryVPNMatch (entries (tlb mpt) i) 
+                         (MIPSPT_mk_tlbentry (pte mpt) as vpn) 
+        \<and> EntryASIDMatch (entries (tlb mpt) i) 
+                         (MIPSPT_mk_tlbentry (pte mpt) as vpn))"
 proof cases
-  assume vpnmatch : "(EntryVPNMatch (entries (tlb mpt) i) (MIPSPT_mk_tlbentry (pte mpt) as vpn))"
+  assume vpnmatch : "(EntryVPNMatch (entries (tlb mpt) i) 
+                     (MIPSPT_mk_tlbentry (pte mpt) as vpn))"
   then show ?thesis
   proof -
-    from vpnmatch valid inrange have X1: "(EntryVPNMatchV vpn (entries (tlb mpt) i))"
+    from vpnmatch valid inrange have X1:
+      "(EntryVPNMatchV vpn (entries (tlb mpt) i))"
       by(simp add:MipsTLBT_EntryMatchVPN_EntryMatchV)
      
     from valid have ptvalid : "MIPSPT_valid (pte mpt)"
@@ -378,18 +403,32 @@ proof cases
       "\<not> EntryASIDMatchA as (entries (tlb mpt) i)"
       by(simp add:EntryMatchVPNASID_def)
     
-    from valid inrange X0 ptvalid have X2: "\<not>EntryASIDMatch (entries (tlb mpt) i) (MIPSPT_mk_tlbentry (pte mpt) as vpn)"
-      by(simp add:EntryASIDMatch_def MipsTLBPT_instance_no_global MIPSPT_TLBENTRY_not_global
-                     MIPSPT_TLBENTRY_asid_is EntryASIDMatchA_def)
+    from valid inrange X0 ptvalid have X2: 
+      "\<not>EntryASIDMatch (entries (tlb mpt) i) 
+                       (MIPSPT_mk_tlbentry (pte mpt) as vpn)"
+      by(simp add:EntryASIDMatch_def MipsTLBPT_instance_no_global 
+                  MIPSPT_TLBENTRY_not_global MIPSPT_TLBENTRY_asid_is 
+                  EntryASIDMatchA_def)
 
     thus ?thesis 
       by(auto)        
   qed
 next
-  assume novpnmatch : "\<not>(EntryVPNMatch (entries (tlb mpt) i) (MIPSPT_mk_tlbentry (pte mpt) as vpn))"
+  assume novpnmatch : 
+    "\<not>(EntryVPNMatch (entries (tlb mpt) i) 
+                     (MIPSPT_mk_tlbentry (pte mpt) as vpn))"
   then show ?thesis
     by(auto)
 qed
+  
+  
+(* ------------------------------------------------------------------------- *)   
+subsubsection "TLB Valid property is preserved"  
+(* ------------------------------------------------------------------------- *)
+  
+text "Now we proof using the two lemmas above that the fault function always 
+      preserves the TLBValid property. We do this by a case distinction, when
+      the entry is not present or when it is."   
   
 lemma MipsTLBT_keeps_TLBValid :
 assumes valid: "MipsTLBPT_valid mpt "
@@ -419,12 +458,16 @@ proof cases
     by(simp add:MIPSPT_TLBENTRY_wellformed )
   
   from fault have nomatch :
-    "(\<forall>i<capacity (tlb mpt). \<not>EntryMatchVPNASID vpn as (entries (tlb mpt) i))"
+    "(\<forall>i<capacity (tlb mpt). 
+        \<not>EntryMatchVPNASID vpn as (entries (tlb mpt) i))"
     by(simp add:MIPSTLB_fault_no_match)
 
   from nomatch ptvalid valid have X1:
     "(\<forall>i<capacity (tlb mpt).
-     \<not> (EntryVPNMatch (entries (tlb mpt) i) (MIPSPT_mk_tlbentry (pte mpt) as vpn) \<and> EntryASIDMatch (entries (tlb mpt) i) (MIPSPT_mk_tlbentry (pte mpt) as vpn)))"
+      \<not>(EntryVPNMatch (entries (tlb mpt) i) 
+                      (MIPSPT_mk_tlbentry (pte mpt) as vpn) 
+      \<and> EntryASIDMatch (entries (tlb mpt) i) 
+                       (MIPSPT_mk_tlbentry (pte mpt) as vpn)))"
     by(auto simp:MipsTLBT_no_EntryMatch)
     
   from ptvalid nomatch X1 have nc:
@@ -452,8 +495,6 @@ next
 qed
   
 
-
-
 (* ------------------------------------------------------------------------- *)   
 subsection "Page Table Valid Preservation"  
 (* ------------------------------------------------------------------------- *)       
@@ -464,12 +505,17 @@ text "Lastly, we show that the fault function preserves the validity of the
 lemma MipsTLBT_keeps_ptvalid:
   "\<And>vpn mpt as. MipsTLBPT_valid mpt \<Longrightarrow> vpn < MIPSPT_EntriesMax 
            \<Longrightarrow> \<forall>m \<in> MipsTLBPT_fault mpt as vpn .  MIPSPT_valid (pte m)"       
-  by(simp add:MipsTLBPT_valid_def MipsTLBPT_update_tlb_def MipsTLBPT_fault_def, 
-     auto)
+  by(simp add:MipsTLBPT_valid_def MipsTLBPT_update_tlb_def 
+              MipsTLBPT_fault_def, auto)
   
 (* ------------------------------------------------------------------------- *)   
 subsection "Validity Preservation"  
 (* ------------------------------------------------------------------------- *)     
+  
+text "By using the three lemmas from above, we can show that the fault function
+      preserves the TLBValid, the page table and instance properties and
+      therefore we can show that the validity of the TLB+page table are
+      preserved."  
   
 lemma MipsTLBPT_keeps_valid :
     assumes valid: "\<And>mpt. MipsTLBPT_valid mpt "
@@ -483,20 +529,21 @@ lemma MipsTLBPT_keeps_valid :
   apply(simp add:MipsTLBT_keeps_TLBValid valid inrange inrange2 )
   done
 
+    
+    
 (* ========================================================================= *)  
-section "Proofs"
+section "Matching TLB Entries"
 (* ========================================================================= *)     
-    
-    
 
-
+text "We now show that if the entry matches a particular ASID and VPN then 
+      the entry is equal to the created entry. We do a case distinction
+      on the vpn, even and odd. "
   
-
-   
+  
 lemma MipsTLBPT_match_is_equlas_even: 
-  assumes inrange:  "i < capacity (tlb mtlb)"
+assumes inrange:  "i < capacity (tlb mtlb)"
     and match: "EntryMatchVPNASID vpn as (entries (tlb mtlb) i) "
-    and  valid: "MipsTLBPT_valid mtlb"
+    and valid: "MipsTLBPT_valid mtlb"
     and veven : "even vpn"
   shows "entries (tlb mtlb) i = MIPSPT_mk_tlbentry (pte mtlb) as vpn"
 proof -
@@ -513,33 +560,36 @@ proof -
     "TLBValid (tlb mtlb)"
     by(simp add:MipsTLBPT_valid_def)       
         
-  from valid inrange match isinstance have X0: "(asid (hi (entries (tlb mtlb) i))) = as"
+  from valid inrange match isinstance have X0: 
+    "(asid (hi (entries (tlb mtlb) i))) = as"
     by(simp add:EntryMatchVPNASID_def
                 EntryASIDMatchA_def 
                 MipsTLBPT_instance_no_global)
               
   from inrange tlbvalid have vpne2ven :
     "even (vpn2 (hi (entries (tlb mtlb) i)))"
-    by(simp add:TLBValid_def TLBEntryWellFormed_def TLBENTRYWellFormed_def 
+    by(simp add:TLBValid_def TLBEntryWellFormed_def 
+                TLBENTRYWellFormed_def 
                 TLBENTRYHIWellFormed_def VPN2Valid_def)
       
   from veven vpne2ven inrange valid match isinstance have  X1:
               "(vpn2 (hi (entries (tlb mtlb) i))) = vpn"
-    by(auto simp add:EntryMatchVPNASID_def EntryVPNMatchV_def EntryMin4KVPN_def 
-                     EntryMax4KVPN_def MipsTLBPT_instance_entry_is_4k num_4k_pages_def
+    by(auto simp add:EntryMatchVPNASID_def EntryVPNMatchV_def 
+                     EntryMin4KVPN_def EntryMax4KVPN_def 
+                     MipsTLBPT_instance_entry_is_4k num_4k_pages_def
                      even_vpn_compare)
            
    from isinstance have X3:
      "(\<forall>i <  (capacity (tlb mtlb)).
         entries (tlb mtlb) i = 
-            MIPSPT_mk_tlbentry (pte mtlb) (asid (hi (entries (tlb mtlb) i) ))  
-                                          (vpn2 (hi (entries (tlb mtlb) i) )))"
+           MIPSPT_mk_tlbentry (pte mtlb) (asid (hi (entries (tlb mtlb) i) ))
+                                         (vpn2 (hi (entries (tlb mtlb) i) )))"
      by(simp add:MipsTLBPT_is_instance_def)
       
    from X3 inrange have X4 : 
      "entries (tlb mtlb) i = 
-            MIPSPT_mk_tlbentry (pte mtlb) (asid (hi (entries (tlb mtlb) i) ))  
-                                          (vpn2 (hi (entries (tlb mtlb) i) ))"
+           MIPSPT_mk_tlbentry (pte mtlb) (asid (hi (entries (tlb mtlb) i) ))
+                                         (vpn2 (hi (entries (tlb mtlb) i) ))"
      by(auto)
        
    from X0 X1 X3 X4 show ?thesis
@@ -547,13 +597,12 @@ proof -
 qed
 
 lemma MipsTLBPT_match_is_equlas_odd: 
-  assumes inrange:  "i < capacity (tlb mtlb)"
+assumes inrange:  "i < capacity (tlb mtlb)"
     and match: "EntryMatchVPNASID vpn as (entries (tlb mtlb) i) "
-    and  valid: "MipsTLBPT_valid mtlb"
+    and valid: "MipsTLBPT_valid mtlb"
     and vodd : "odd vpn"
   shows "entries (tlb mtlb) i = MIPSPT_mk_tlbentry (pte mtlb) as vpn"
 proof -
-    
   from valid have ptvalid :
     "MIPSPT_valid (pte mtlb)"
     by(simp add:MipsTLBPT_valid_def)       
@@ -566,7 +615,8 @@ proof -
     "TLBValid (tlb mtlb)"
     by(simp add:MipsTLBPT_valid_def)       
         
-  from valid inrange match isinstance have X0: "(asid (hi (entries (tlb mtlb) i))) = as"
+  from valid inrange match isinstance have X0: 
+    "(asid (hi (entries (tlb mtlb) i))) = as"
     by(simp add:EntryMatchVPNASID_def
                 EntryASIDMatchA_def 
                 MipsTLBPT_instance_no_global)
@@ -577,18 +627,20 @@ proof -
                 TLBENTRYHIWellFormed_def VPN2Valid_def)
       
   from vodd vpne2ven inrange valid match isinstance have  X1:
-              "(vpn2 (hi (entries (tlb mtlb) i))) = (vpn - 1)"
-    by(auto simp add:EntryMatchVPNASID_def EntryVPNMatchV_def EntryMin4KVPN_def 
-                     EntryMax4KVPN_def MipsTLBPT_instance_entry_is_4k num_4k_pages_def
-                     even_vpn_compare)
+    "(vpn2 (hi (entries (tlb mtlb) i))) = (vpn - 1)"
+    by(auto simp:EntryMatchVPNASID_def EntryVPNMatchV_def EntryMin4KVPN_def 
+                 EntryMax4KVPN_def MipsTLBPT_instance_entry_is_4k num_4k_pages_def
+                 even_vpn_compare)
            
    from inrange isinstance have X3:
      "entries (tlb mtlb) i = 
-           MIPSPT_mk_tlbentry (pte mtlb) (asid (hi (entries (tlb mtlb) i) ))  
-                                         (vpn2 (hi (entries (tlb mtlb) i) ))"
+          MIPSPT_mk_tlbentry (pte mtlb) (asid (hi (entries (tlb mtlb) i) ))
+                                        (vpn2 (hi (entries (tlb mtlb) i) ))"
      by(simp add:MipsTLBPT_is_instance_def)
 
-   from vodd have X4:  "MIPSPT_mk_tlbentry (pte mtlb) as (vpn - 1) = MIPSPT_mk_tlbentry (pte mtlb) as vpn"
+   from vodd have X4:  
+     "MIPSPT_mk_tlbentry (pte mtlb) as (vpn - 1) 
+                  = MIPSPT_mk_tlbentry (pte mtlb) as vpn"
      by(simp add:MIPSPT_mk_tlbentry_def)
        
    from X0 X1 X3 X4 show ?thesis
@@ -597,9 +649,9 @@ qed
   
   
 lemma MipsTLBPT_match_is_equlas: 
-  assumes inrange:  "i < capacity (tlb mtlb)"
+assumes inrange:  "i < capacity (tlb mtlb)"
     and match: "EntryMatchVPNASID vpn as (entries (tlb mtlb) i) "
-    and  valid: "MipsTLBPT_valid mtlb"
+    and valid: "MipsTLBPT_valid mtlb"
   shows "entries (tlb mtlb) i = MIPSPT_mk_tlbentry (pte mtlb) as vpn"
 proof cases
   assume veven: "even vpn"
@@ -611,10 +663,20 @@ next
     by(simp add:MipsTLBPT_match_is_equlas_odd inrange match valid)
 qed
   
+  
+(* ========================================================================= *)  
+section "Existence of Entry"
+(* ========================================================================= *)       
+
+text "If for a given ASID/VPN the translation attempt does not throw a refill
+      exception then there exist an entry in the TLB that matches the
+      ASID/VPN."  
+  
 lemma MipsTLBPT_no_fault_entry_exist :
-assumes  valid: "MipsTLBPT_valid mtlb"
+assumes valid: "MipsTLBPT_valid mtlb"
     and translates : "MIPSTLB_try_translate (tlb mtlb) as vpn \<noteq> EXNREFILL"
-  shows  "(\<exists>i < (capacity (tlb mtlb)). (entries (tlb mtlb) i) = (MIPSPT_mk_tlbentry (pte mtlb) as vpn))"
+  shows "(\<exists>i < (capacity (tlb mtlb)). 
+           (entries (tlb mtlb) i) = (MIPSPT_mk_tlbentry (pte mtlb) as vpn))"
 proof -
   from valid have inst:
     "MipsTLBPT_is_instance mtlb"
@@ -628,32 +690,43 @@ proof -
    
   from inst have inst2: 
     "(\<forall>i<capacity (tlb mtlb). 
-        entries (tlb mtlb) i = MIPSPT_mk_tlbentry (pte mtlb) 
-                                                  (asid (hi (entries (tlb mtlb) i))) 
-                                                  (vpn2 (hi (entries (tlb mtlb) i))))"
+        entries (tlb mtlb) i = 
+          MIPSPT_mk_tlbentry (pte mtlb) 
+                             (asid (hi (entries (tlb mtlb) i))) 
+                             (vpn2 (hi (entries (tlb mtlb) i))))"
     by(simp add:MipsTLBPT_is_instance_def)
   
-  have doesmatch: "EntryMatchVPNASID vpn as  (MIPSPT_mk_tlbentry (pte mtlb) as vpn)"
+  have doesmatch: 
+    "EntryMatchVPNASID vpn as (MIPSPT_mk_tlbentry (pte mtlb) as vpn)"
     by(simp add:MIPSPT_TLBENTRY_match)      
       
   from translates have matchexist:
      "(\<exists>i<capacity (tlb mtlb). EntryMatchVPNASID vpn as (entries (tlb mtlb) i))"
     by(simp add:MIPSTLB_try_translate_exist_match)
-       
       
-  from valid have X0: "\<And>i as vpn. i < capacity (tlb mtlb) 
-          \<and> EntryMatchVPNASID vpn as (entries (tlb mtlb) i) \<longrightarrow>  entries (tlb mtlb) i = MIPSPT_mk_tlbentry (pte mtlb) as vpn"
+  from valid have X0: 
+    "\<And>i as vpn. i < capacity (tlb mtlb) 
+         \<and> EntryMatchVPNASID vpn as (entries (tlb mtlb) i) 
+            \<longrightarrow>  entries (tlb mtlb) i = MIPSPT_mk_tlbentry (pte mtlb) as vpn"
     by(simp add:MipsTLBPT_match_is_equlas)
       
   from matchexist X0 show ?thesis by(auto)  
 qed
   
 
-lemma  XYZ:
-  assumes inrange: " i < capacity (tlb mtlb)"
+(* ========================================================================= *)  
+section "No Match implies no Translate"
+(* ========================================================================= *)         
+
+text "For any entry in the TLB other than the one that may match, the
+      translate function will return the empty set."
+  
+lemma  MipsTLBPT_Entry_no_match_no_translate:
+assumes inrange: " i < capacity (tlb mtlb)"
     and  valid: "MipsTLBPT_valid mtlb"
     and  inotmatch: " i \<noteq> (SOME j. j < (capacity (tlb mtlb)) 
-                \<and> ((entries (tlb mtlb) j)) = (MIPSPT_mk_tlbentry (pte mtlb) as vpn))"
+                             \<and> ((entries (tlb mtlb) j)) = 
+                                  (MIPSPT_mk_tlbentry (pte mtlb) as vpn))"
   shows "TLBENTRY_translate (entries (tlb mtlb) i) as vpn = {}"
 proof cases
   assume fault: "MIPSTLB_try_translate (tlb mtlb) as vpn = EXNREFILL"
@@ -669,7 +742,6 @@ next
   assume nofault: "MIPSTLB_try_translate (tlb mtlb) as vpn \<noteq> EXNREFILL"
   then show ?thesis 
   proof -
-    
     from valid have tlbvalid:
       "TLBValid (tlb mtlb)"
       by(simp add:MipsTLBPT_valid_def)
@@ -682,8 +754,12 @@ next
        "(\<forall>i < (capacity (tlb mtlb)). mask ((entries (tlb mtlb)) i) = MASK4K)"
     proof -
       from inst have Z0:
-        "(\<forall>i < (capacity (tlb mtlb)). mask ((entries (tlb mtlb)) i) = MASK4K) = 
-            (\<forall>i < (capacity (tlb mtlb)). mask (MIPSPT_mk_tlbentry (pte mtlb) (asid (hi (entries (tlb mtlb) i))) (vpn2 (hi (entries (tlb mtlb) i)))) = MASK4K)"
+        "(\<forall>i < capacity (tlb mtlb). mask ((entries (tlb mtlb)) i) = MASK4K) =
+            (\<forall>i < (capacity (tlb mtlb)). 
+                  mask (MIPSPT_mk_tlbentry (pte mtlb) 
+                                           (asid (hi (entries (tlb mtlb) i)))
+                                           (vpn2 (hi (entries (tlb mtlb) i))))
+                    = MASK4K)"
         by(simp add:MipsTLBPT_is_instance_def)
           
       from Z0 show ?thesis 
@@ -695,22 +771,27 @@ next
           (entries (tlb mtlb) j) = (MIPSPT_mk_tlbentry (pte mtlb) as vpn))"     
       by(simp add:MipsTLBPT_no_fault_entry_exist)        
         
-    from exist have match: "
-        entries (tlb mtlb) 
-            (SOME j. j < (capacity (tlb mtlb)) 
-                \<and> ((entries (tlb mtlb) j)) = (MIPSPT_mk_tlbentry (pte mtlb) as vpn))
+    from exist have match: 
+      "entries (tlb mtlb) 
+          (SOME j. j < (capacity (tlb mtlb)) 
+             \<and> ((entries (tlb mtlb) j)) = (MIPSPT_mk_tlbentry (pte mtlb) as vpn))
            = (MIPSPT_mk_tlbentry (pte mtlb) as vpn)"
        by(simp add:some_eq_ex[symmetric])
     
-    from exist have ir2: " (SOME j. j < (capacity (tlb mtlb)) 
-                \<and> ((entries (tlb mtlb) j)) = (MIPSPT_mk_tlbentry (pte mtlb) as vpn)) <  (capacity (tlb mtlb)) "
+     from exist have ir2: 
+       "(SOME j. j < (capacity (tlb mtlb))  \<and> ((entries (tlb mtlb) j)) 
+            = (MIPSPT_mk_tlbentry (pte mtlb) as vpn)) <  (capacity (tlb mtlb))"
       by(simp add:some_eq_ex[symmetric])
           
-    have  X0: "EntryMatchVPNASID vpn as (entries (tlb mtlb) (SOME j. j < (capacity (tlb mtlb)) 
-                \<and> ((entries (tlb mtlb) j)) = (MIPSPT_mk_tlbentry (pte mtlb) as vpn)))"
+    have X0: 
+      "EntryMatchVPNASID vpn as (entries (tlb mtlb) (SOME j. 
+          j < (capacity (tlb mtlb)) \<and> ((entries (tlb mtlb) j)) 
+                = (MIPSPT_mk_tlbentry (pte mtlb) as vpn)))"
       by(simp add:match MIPSPT_TLBENTRY_match)
     
-    have X1: "(SOME j. j < capacity (tlb mtlb) \<and> entries (tlb mtlb) j = MIPSPT_mk_tlbentry (pte mtlb) as vpn) \<noteq> i"
+    have X1: 
+      "(SOME j. j < capacity (tlb mtlb) \<and> entries (tlb mtlb) j 
+            = MIPSPT_mk_tlbentry (pte mtlb) as vpn) \<noteq> i"
       by(auto simp add:inotmatch)
         
     from tlbvalid inrange ir2 mask4k2 X0 X1 have nomatch :
@@ -722,45 +803,82 @@ next
   qed
 qed
 
-
+(* ========================================================================= *)  
+section "Translate Simplification"
+(* ========================================================================= *)       
+  
+text "Next we show the equivalence of the translate function to be equal to 
+      directly reading out the entry from the page table."  
   
 lemma MipsTLBPT_translate_is:
   assumes inrange: "vpn < MIPSPT_EntriesMax"
     and inrange2: "as < ASIDMax"
     and  valid: "MipsTLBPT_valid mtlb"
   shows "MipsTLBPT_translate mtlb as vpn = 
-           (if (v ((entry (pte mtlb)) vpn as)) then {(pfn ((entry  (pte mtlb)) vpn as))} else {})" 
+           (if (v ((entry (pte mtlb)) vpn as))
+            then {(pfn ((entry  (pte mtlb)) vpn as))} else {})" 
 proof cases
   assume fault: "MIPSTLB_try_translate (tlb mtlb) as vpn = EXNREFILL"
   then show ?thesis 
   proof -
-    from valid have tlbvalid : "TLBValid (tlb mtlb)"
+    from valid have tlbvalid : 
+      "TLBValid (tlb mtlb)"
       by(simp add:MipsTLBPT_valid_def)
         
-    from fault have X0: "MipsTLBPT_translate mtlb as vpn = 
-      \<Union>{MIPSTLB_translate (tlb m) as vpn |m. m \<in> MipsTLBPT_update_tlb mtlb as vpn}"
+    from fault have X0: 
+      "MipsTLBPT_translate mtlb as vpn = 
+             \<Union>{MIPSTLB_translate (tlb m) as vpn | m. 
+                m \<in> MipsTLBPT_update_tlb mtlb as vpn}"
       by(simp add:MipsTLBPT_translate_def MipsTLBPT_fault_def)
 
-    have X1: " ... = \<Union>{MIPSTLB_translate (tlb m) as vpn |m. m \<in> {\<lparr>tlb = t, pte = pte mtlb\<rparr> |t. t \<in> tlbwr (MIPSPT_mk_tlbentry (pte mtlb) as vpn) (tlb mtlb)}}"
+    have X1: 
+      " ... = \<Union>{MIPSTLB_translate (tlb m) as vpn |m. 
+            m \<in> {\<lparr>tlb = t, pte = pte mtlb\<rparr> |t. 
+            t \<in> tlbwr (MIPSPT_mk_tlbentry (pte mtlb) as vpn) (tlb mtlb)}}"
       by(simp only:MipsTLBPT_update_tlb_def)
     
-    have X2: " ... = \<Union>{MIPSTLB_translate (tlb m) as vpn |m.
+    have X2: 
+      " ... = \<Union>{MIPSTLB_translate (tlb m) as vpn |m.
        \<exists>t. m = \<lparr>tlb = t, pte = pte mtlb\<rparr> \<and>
-           (\<exists>i. t = \<lparr>capacity = capacity (tlb mtlb), wired = wired (tlb mtlb), entries = (entries (tlb mtlb))(i := MIPSPT_mk_tlbentry (pte mtlb) as vpn)\<rparr> \<and> i \<in> RandomIndexRange (tlb mtlb))}"
+           (\<exists>i. t = \<lparr>
+            capacity = capacity (tlb mtlb), 
+            wired = wired (tlb mtlb), 
+            entries = (entries (tlb mtlb))(
+                i := MIPSPT_mk_tlbentry (pte mtlb) as vpn)\<rparr>
+         \<and> i \<in> RandomIndexRange (tlb mtlb))}"
       by(simp add:tlbwr_def)
     
-    have X3: " ... = \<Union>{MIPSTLB_translate (tlb m) as vpn |m.
-       \<exists>i. m = \<lparr>tlb = \<lparr>capacity = capacity (tlb mtlb), wired = wired (tlb mtlb), entries = (entries (tlb mtlb))(i := MIPSPT_mk_tlbentry (pte mtlb) as vpn)\<rparr>, pte = pte mtlb\<rparr> 
+    have X3: 
+      "... = \<Union>{MIPSTLB_translate (tlb m) as vpn |m.
+          \<exists>i. m = \<lparr>tlb = \<lparr>
+              capacity = capacity (tlb mtlb), 
+              wired = wired (tlb mtlb), 
+              entries = (entries (tlb mtlb))(
+                  i := MIPSPT_mk_tlbentry (pte mtlb) as vpn)\<rparr>, pte = pte mtlb\<rparr> 
             \<and> i \<in> RandomIndexRange (tlb mtlb)}"
       by(auto)
     
-    have X4: " ... =  \<Union>{{pa| pa j. pa \<in> TLBENTRY_translate (entries (tlb m) j) as vpn \<and> j < capacity (tlb m)} |m i.
-       m = \<lparr>tlb = \<lparr>capacity = capacity (tlb mtlb), wired = wired (tlb mtlb), entries = (entries (tlb mtlb))(i := MIPSPT_mk_tlbentry (pte mtlb) as vpn)\<rparr>, pte = pte mtlb\<rparr> \<and>
+    have X4: 
+      " ... =  \<Union>{{pa| pa j. pa \<in> TLBENTRY_translate (entries (tlb m) j) as vpn 
+          \<and> j < capacity (tlb m)} |m i.
+           m = \<lparr>tlb = \<lparr>
+              capacity = capacity (tlb mtlb), 
+              wired = wired (tlb mtlb), 
+              entries = (entries (tlb mtlb))(
+              i := MIPSPT_mk_tlbentry (pte mtlb) as vpn)\<rparr>, pte = pte mtlb\<rparr> \<and>
            i \<in> RandomIndexRange (tlb mtlb)}"
       by(simp add:MIPSTLB_translate_def)
         
-    have X5: "... = \<Union>{ {pa| pa j. pa \<in> TLBENTRY_translate (entries (tlb m) j) as vpn \<and> j < capacity (tlb m) \<and> i = j} \<union> {pa| pa j. pa \<in> TLBENTRY_translate (entries (tlb m) j) as vpn \<and> j < capacity (tlb m) \<and> i \<noteq> j} |m i.
-       m = \<lparr>tlb = \<lparr>capacity = capacity (tlb mtlb), wired = wired (tlb mtlb), entries = (entries (tlb mtlb))(i := MIPSPT_mk_tlbentry (pte mtlb) as vpn)\<rparr>, pte = pte mtlb\<rparr> \<and>
+    have X5:
+      "... = \<Union>{ {pa| pa j. 
+        pa \<in> TLBENTRY_translate (entries (tlb m) j) as vpn \<and> j < capacity (tlb m) \<and> i = j}
+         \<union> {pa| pa j. pa \<in> TLBENTRY_translate (entries (tlb m) j) as vpn \<and> j < capacity (tlb m) \<and> i \<noteq> j} | 
+  m i.
+       m = \<lparr>tlb = \<lparr>
+            capacity = capacity (tlb mtlb), 
+            wired = wired (tlb mtlb), 
+            entries = (entries (tlb mtlb))(i := MIPSPT_mk_tlbentry (pte mtlb) as vpn)\<rparr>,
+           pte = pte mtlb\<rparr> \<and>
            i \<in> RandomIndexRange (tlb mtlb)}"
       by(blast)
     
@@ -849,7 +967,7 @@ next
      from valid have X5:  " ... =  {pa | pa i. i = (SOME j. j < (capacity (tlb mtlb)) 
                 \<and> ((entries (tlb mtlb) j)) = (MIPSPT_mk_tlbentry (pte mtlb) as vpn))
                           \<and> pa \<in> TLBENTRY_translate  (MIPSPT_mk_tlbentry (pte mtlb) as vpn) as vpn}"
-       by(auto simp add:XYZ)
+       by(auto simp add:MipsTLBPT_Entry_no_match_no_translate)
          
      have X6: " ... =   (if (v ((entry (pte mtlb)) vpn as)) then {(pfn ((entry  (pte mtlb)) vpn as))} else {})"
        by(simp add:MIPSPT_TLBENTRY_translate_is)
