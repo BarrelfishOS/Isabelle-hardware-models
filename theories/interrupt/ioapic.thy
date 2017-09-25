@@ -56,7 +56,6 @@ record SYSTEM =
   outPortSet :: "PORT set"
   controllers :: "PORT \<Rightarrow> nodeid"
   
-
 definition ioapic_mapvalid :: "IRQ \<Rightarrow> IRQ \<Rightarrow> bool"
   where "ioapic_mapvalid ini outi = ( ((format ini)   = FEMPTY   \<and> (fst (irq ini)) < 24) \<and> 
                                       ((format outi) = FVECTOR)  \<and> (snd (irq outi)) \<ge> 32 \<and> (snd (irq outi)) < 235 )"
@@ -102,7 +101,24 @@ definition replace_entry :: "SYSTEM \<Rightarrow> IRQ \<Rightarrow> IRQ \<Righta
       accept := accept n,
       translate := (\<lambda>va. (if \<lparr>format = FEMPTY, irq=(va, 0) \<rparr> = i then (irq_to_map s i i3 va)  else  (translate n va))) \<rparr>"
     
- 
+(* value "ioapic_mapvalid ( out *)
+definition test_i :: IRQ
+  where  "test_i = \<lparr>format = FEMPTY, irq = (3,2)\<rparr>"
+    
+definition test_j :: IRQ
+  where  "test_j = \<lparr>format = FVECTOR, irq = (4,33)\<rparr>"
+    
+definition "an_ioapic" :: CONTROLLER
+  where "an_ioapic = ioapic {1,2,3} {4,5,6}"
+     
+value "ioapic_mapvalid test_i test_i"
+  
+value "mapValid an_ioapic test_i test_j"
+  
+value "(map an_ioapic)(test_i := test_j)"
+    
+value "ioapic_add_map test_i test_j an_ioapic "
+  
     
 lemma assumes valid: "(mapValid c) a b"
   shows "ioapic_to_node s ` ioapic_add_map a b c = {replace_entry s a (map c a) b (ioapic_to_node s c)}"
