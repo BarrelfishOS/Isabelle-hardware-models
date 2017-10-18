@@ -88,3 +88,82 @@ definition ioapic_mapvalid :: "(IRQ \<Rightarrow> IRQ set) set"
  (* ( ((format ini)   = FEMPTY   \<and> (fst (irq ini)) < 24) \<and> 
                                       ((format outi) = FVECTOR)  \<and> (snd (irq outi)) \<ge> 32 \<and> (snd (irq outi)) < 235 )" *)
                                
+                              
+definition ioapic :: "CONTROLLER_CLASS"
+  where "ioapic  = \<lparr> in_port_num = 24, out_port_num = 4, mapValid = ioapic_mapvalid  \<rparr>"
+    
+ 
+definition ioapic_add_map :: "IRQ \<Rightarrow> IRQ \<Rightarrow> CONTROLLER \<Rightarrow> CONTROLLER set"
+  where "ioapic_add_map iirq oirq c = 
+    (if (mapValid c iirq oirq) then
+       { \<lparr> inPorts = (inPorts c), outPorts = (outPorts c), mapValid = (mapValid c), 
+           map = (map c)(iirq := oirq) \<rparr>  } else UNIV)"
+ 
+lemma "(mapValid c) a b \<Longrightarrow> (\<forall>c' \<in> (ioapic_add_map a b c). (map c' a) = b)"
+  by(simp add:ioapic_add_map_def)
+
+lemma "\<not>(mapValid c) a b \<Longrightarrow> ((ioapic_add_map a b c) = UNIV)"
+  by(simp add:ioapic_add_map_def)
+
+    
+definition irq_to_addr :: "IRQ \<Rightarrow> addr"
+  where "irq_to_addr i = ((snd (irq i)) * 1024 + (fst (irq i)))"
+    
+    
+definition irq_to_map :: "SYSTEM \<Rightarrow> IRQ \<Rightarrow> IRQ \<Rightarrow> nat \<Rightarrow> (nat \<times> nat ) set"
+  where "irq_to_map s i i2 a = (if \<lparr>format = FEMPTY, irq=(a, 0) \<rparr> = i  then 
+                              { (controllers s (fst (irq i2)), irq_to_addr i2) } else {})"
+    
+
+definition ioapic_to_node :: "SYSTEM \<Rightarrow> CONTROLLER  \<Rightarrow> node" where
+  "ioapic_to_node s c =
+    \<lparr> accept = {},
+      translate = (\<lambda> a. if a < 24 then irq_to_map s \<lparr>format = FEMPTY, irq=(a, 0) \<rparr> 
+                                        (map c \<lparr>format = FEMPTY, irq=(a, 0) \<rparr>) a else {}) \<rparr>" 
+    
+  
+definition replace_entry :: "SYSTEM \<Rightarrow> IRQ \<Rightarrow> IRQ \<Rightarrow>  IRQ  \<Rightarrow> node \<Rightarrow> node"
+  where
+    "replace_entry s i i2 i3 n = n  \<lparr>
+      accept := accept n,
+      translate := (\<lambda>va. (if \<lparr>format = FEMPTY, irq=(va, 0) \<rparr> = i then (irq_to_map s i i3 va)  else  (translate n va))) \<rparr>"
+    
+(* value "ioapic_mapvalid ( out *)
+definition test_i :: IRQ
+  where  "test_i = \<lparr>format = FEMPTY, irq = (3,2)\<rparr>"
+    
+definition test_j :: IRQ
+  where  "test_j = \<lparr>format = FVECTOR, irq = (4,33)\<rparr>"
+    
+definition "an_ioapic" :: CONTROLLER
+  where "an_ioapic = ioapic {1,2,3} {4,5,6}"
+     
+value "ioapic_mapvalid test_i test_i"
+  
+value "mapValid an_ioapic test_i test_i"
+  
+value "(map an_ioapic)(test_i := test_j)"
+    
+lemma "(mapValid an_ioapic x y) = False \<Longrightarrow> 
+        ioapic_add_map x y an_ioapic = UNIV "
+  by(simp add:ioapic_add_map_def)
+    
+lemma xy: "mapValid an_ioapic test_i test_i = False"    
+  by(auto simp :ioapic_def ioapic_mapvalid_def an_ioapic_def test_i_def)
+  
+    
+lemma "ioapic_add_map test_i test_i an_ioapic = UNIV"
+  by(simp add:ioapic_add_map_def xy)
+    
+  
+  
+    
+lemma assumes valid: "(mapValid c) a b"
+  shows "ioapic_to_node s ` ioapic_add_map a b c = {replace_entry s a (map c a) b (ioapic_to_node s c)}"
+  apply(auto)
+  sorry
+
+  
+  
+  
+end
