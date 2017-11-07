@@ -27,64 +27,27 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (*<*)
 theory ioapic
-  imports Main Set  "../model/Model" "../model/Syntax"
+  imports interrupt Main Set  "../model/Model" "../model/Syntax"
 begin
 (*>*)
-   
-type_synonym PORT = nat
-  
-type_synonym VECTOR = nat
- 
-type_synonym CONTROLLER_NAME = nat
-  
-datatype FORMAT = FINVALID | FEMPTY | FVECTOR | FMEMWRITE
-  
-record IRQ = 
-  format :: FORMAT
-  irq :: "PORT \<times> VECTOR"
     
-definition NULL_IRQ :: IRQ
-  where "NULL_IRQ = \<lparr>format = FINVALID, irq=(0, 0) \<rparr>"  
-  
-record CONTROLLER_CLASS =
-  in_port_num :: nat
-  out_port_num :: nat
-  mapValid :: "(IRQ \<Rightarrow> IRQ set) set"
-
-(* Configuration of a controller *)  
-record CONTROLLER =
-  map      :: "IRQ \<Rightarrow> IRQ set"
- 
-(* Interconnect of the system + each controller with a class *)
-record SYSTEM =
-  controller :: "CONTROLLER_NAME \<Rightarrow> (CONTROLLER \<times> CONTROLLER_CLASS) set"
-  net :: "CONTROLLER_NAME \<Rightarrow> nat \<Rightarrow> (CONTROLLER_NAME \<Rightarrow> nat) set"
-  
-(* valid system = all ports wired, all controller in valid state + ...*)
-(* lift to decoding net, assuming valid *)
-(* look at decoding net to verify *)
-(* assuming system is valid, configuration update \<Rightarrow> system valid *)  
-  
-(* Arguments that do not produce an empty set, see dom *)
-definition
-  doms :: "('a \<Rightarrow> 'b set) \<Rightarrow> 'a set" where
-  "doms m = {a. m a \<noteq> {}}"
-
-definition ioapic_mapvalid_indiv :: "IRQ \<Rightarrow> IRQ set"
-  where "ioapic_mapvalid_indiv x = {}"
-    
-definition ioapic_mapvalid_indiv_test :: "(IRQ \<Rightarrow> IRQ set) \<Rightarrow> bool"
-  where "ioapic_mapvalid_indiv_test x = True"    
-
 definition ioapic_mapvalid_indiv_dom_valid :: "IRQ set \<Rightarrow> bool"
-    where "ioapic_mapvalid_indiv_dom_valid xs  \<longleftrightarrow>  (\<forall>x \<in> xs. format x = FEMPTY)"
+  where "ioapic_mapvalid_indiv_dom_valid xs  \<longleftrightarrow>  (\<forall>x \<in> xs. format x = FEMPTY)"
+    
+definition ioapic_mapvalid_indiv_res_valid_one :: "IRQ \<Rightarrow> bool"
+  where "ioapic_mapvalid_indiv_res_valid_one outi =  (((format outi) = FVECTOR)  \<and> (snd (irq outi)) \<ge> 32 \<and> (snd (irq outi)) < 235 )"
+    
+definition ioapic_mapvalid_indiv_res_valid :: "IRQ set \<Rightarrow> bool"
+  where "ioapic_mapvalid_indiv_res_valid xs =  (if is_singleton xs then ioapic_mapvalid_indiv_res_valid_one (the_elem xs) else False)"
+      
+definition ioapic_mapvalid_pred :: "(IRQ \<Rightarrow> IRQ set) \<Rightarrow> bool"
+  where "ioapic_mapvalid_pred x = (ioapic_mapvalid_indiv_dom_valid (doms x) \<and> (\<forall>xs. xs \<in> (doms x) \<longleftrightarrow> ioapic_mapvalid_indiv_res_valid (x xs)))"    
+    
 
-definition ioapic_mapvalid_indiv_test_2 :: "(IRQ \<Rightarrow> IRQ set) \<Rightarrow> bool"
-  where "ioapic_mapvalid_indiv_test_2 x = ioapic_mapvalid_indiv_dom_valid (doms x)"    
-    
 definition ioapic_mapvalid :: "(IRQ \<Rightarrow> IRQ set) set"
-  where "ioapic_mapvalid = {x. ioapic_mapvalid_indiv_test x}"
+  where "ioapic_mapvalid = {x. ioapic_mapvalid_pred x}"
     
- (* ( ((format ini)   = FEMPTY   \<and> (fst (irq ini)) < 24) \<and> 
-                                      ((format outi) = FVECTOR)  \<and> (snd (irq outi)) \<ge> 32 \<and> (snd (irq outi)) < 235 )" *)
-                               
+definition ioapic :: "CONTROLLER_CLASS"
+  where "ioapic = \<lparr>in_port_num = 24, out_port_num = 8, map_valid = ioapic_mapvalid \<rparr>"
+    
+end
