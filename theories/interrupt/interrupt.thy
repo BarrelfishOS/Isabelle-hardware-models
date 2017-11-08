@@ -87,8 +87,6 @@ definition sys_valid :: "SYSTEM \<Rightarrow> bool"
   where "sys_valid s = (\<forall> c. c \<in> (dom (controller s)) \<longrightarrow> sys_ctrl_valid s c)"
 
 
- 
-    
 (* lift to decoding net, assuming valid *)
     
 (* this does the port+vector/memaddr to natural magic *)
@@ -100,8 +98,6 @@ definition irq_format_nat_decode :: "nat \<Rightarrow> FORMAT option" where
   "irq_format_nat_decode x = (if fst (prod_decode x) = 0 then Some FINVALID else if 
    fst (prod_decode x) = 1 then Some FEMPTY else if fst (prod_decode x) = 2 then Some (FVECTOR (snd (prod_decode x))) else if
    fst (prod_decode x) = 3 then Some (FMEMWRITE (fst (prod_decode (snd (prod_decode x)))) (snd (prod_decode (snd (prod_decode x))))) else None)"
-
-
 
 lemma format_enc_inv: "irq_format_nat_decode(irq_format_nat_encode x) = Some x"
   apply(simp add:irq_format_nat_encode_def add:irq_format_nat_decode_def)
@@ -117,27 +113,41 @@ definition irq_nat_decode :: "nat \<Rightarrow> IRQ option" where
 lemma "irq_nat_decode(irq_nat_encode x) = Some x"
   by(simp add:irq_nat_encode_def add:irq_nat_decode_def add:format_enc_inv)
 
-(* This maps an outgoing IRQ to a node by applying the net function *)
-definition out_irq_to_name :: "SYSTEM \<Rightarrow> IRQ \<Rightarrow> name set" where
-  "out_irq_to_name s i = List.map_project (\<lambda>p. (Some (irq_nat_encode(snd p)))) ((net s) i)"
 
-(*
+(* iis is an output set at c,  perform net lookup to give back input interrupts at controllers (as set)*)
+definition net_set_translate :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> IRQ set \<Rightarrow> (CONTROLLER_NAME \<times> IRQ) set"
+  where "net_set_translate s c iis = \<Union> { {(fst y, \<lparr> format = (format x), port = (snd y)\<rparr>) | y. y \<in> ((net s) c (port x))} | x. x \<in> iis }"
+
+(* A set of input interrupts translated to a a name set *)
+definition irq_set_to_name_set :: "(CONTROLLER_NAME \<times> IRQ) set \<Rightarrow> name set"
+  where "irq_set_to_name_set is = { (fst a, irq_nat_encode (snd a)) | a. a \<in> is}"
+
+(* Apply net translation, then translate to names *)
+definition conf_to_translate_mod_conf :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> (IRQ \<Rightarrow> IRQ set) \<Rightarrow> IRQ \<Rightarrow> name set"
+  where "conf_to_translate_mod_conf s c conf i = irq_set_to_name_set (net_set_translate s c (conf i))"
+
+(* get rid of option *)
+definition conf_to_translate_mod_c :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> IRQ \<Rightarrow> name set"
+  where "conf_to_translate_mod_c s c i = (case ((controller s) c) of Some ctrl \<Rightarrow> conf_to_translate_mod_conf s c (map (fst ctrl)) i |
+    None \<Rightarrow> {})"
+
+(* get rid of option *)
+definition conf_to_translate_mod :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> IRQ option \<Rightarrow> name set"
+  where "conf_to_translate_mod s c ini = (case ini of Some i \<Rightarrow>
+            conf_to_translate_mod_c s c i
+         | None \<Rightarrow> {})"
+
 definition conf_to_translate :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> (addr \<Rightarrow> name set)"
-  where "conf_to_translate s c = (\<lambda>addr. { List.map_project ( ((fst (controller s)) c)) (irq_nat_decode addr)})"
-*)
-
-definition conf_to_translate_p1 :: "SYSTEM \<Rightarrow> (IRQ \<Rightarrow> IRQ set) \<Rightarrow> IRQ option \<Rightarrow> name set" 
-  where "conf_to_translate_p1 s conf i = {}"
-
-definition conf_to_translate :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> (addr \<Rightarrow> name set)"
-  where "conf_to_translate s c = (case ((controller s) c) of Some ctrl \<Rightarrow> (\<lambda>addr. conf_to_translate_p1 s (map (fst ctrl)) (irq_nat_decode addr)) | None \<Rightarrow> (\<lambda>_. {}))"
+  where "conf_to_translate s c = (case ((controller s) c) of Some ctrl \<Rightarrow>
+            (\<lambda>addr. conf_to_translate_mod s c (irq_nat_decode addr))
+         | None \<Rightarrow> (\<lambda>_. {}))"
     
 definition mk_node :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> node"
   where "mk_node s c = (case (sys_ctrl_act_conf s c) of None \<Rightarrow> empty_node |
-         Some conf \<Rightarrow> \<lparr>accept = {}, translate = conf_to_translate conf \<rparr>)"
+         Some conf \<Rightarrow> \<lparr>accept = {}, translate = conf_to_translate s c \<rparr>)"
     
 definition mk_net :: "SYSTEM \<Rightarrow> net"
-  where "mk_net s = empty_net"
+  where "mk_net s = (\<lambda>nodeid. mk_node s nodeid)"
     
   
 end
