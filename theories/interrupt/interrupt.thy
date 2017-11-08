@@ -57,7 +57,7 @@ record CONTROLLER =
 (* Interconnect of the system + each controller with a class *)
 record SYSTEM =
   controller :: "CONTROLLER_NAME \<Rightarrow> (CONTROLLER \<times> CONTROLLER_CLASS) option"
-  net :: "CONTROLLER_NAME \<Rightarrow> nat \<Rightarrow> (CONTROLLER_NAME \<Rightarrow> nat) set"
+  net :: "CONTROLLER_NAME \<Rightarrow> nat \<Rightarrow> (CONTROLLER_NAME \<times> nat) set"
   
 (* look at decoding net to verify *)
 (* assuming system is valid, configuration update \<Rightarrow> system valid *)  
@@ -116,10 +116,21 @@ definition irq_nat_decode :: "nat \<Rightarrow> IRQ option" where
 
 lemma "irq_nat_decode(irq_nat_encode x) = Some x"
   by(simp add:irq_nat_encode_def add:irq_nat_decode_def add:format_enc_inv)
-  
-   
-definition conf_to_translate :: "(IRQ \<Rightarrow> IRQ set) \<Rightarrow> (addr \<Rightarrow> name set)"
-  where "conf_to_translate c = (\<lambda>_. {})"
+
+(* This maps an outgoing IRQ to a node by applying the net function *)
+definition out_irq_to_name :: "SYSTEM \<Rightarrow> IRQ \<Rightarrow> name set" where
+  "out_irq_to_name s i = List.map_project (\<lambda>p. (Some (irq_nat_encode(snd p)))) ((net s) i)"
+
+(*
+definition conf_to_translate :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> (addr \<Rightarrow> name set)"
+  where "conf_to_translate s c = (\<lambda>addr. { List.map_project ( ((fst (controller s)) c)) (irq_nat_decode addr)})"
+*)
+
+definition conf_to_translate_p1 :: "SYSTEM \<Rightarrow> (IRQ \<Rightarrow> IRQ set) \<Rightarrow> IRQ option \<Rightarrow> name set" 
+  where "conf_to_translate_p1 s conf i = {}"
+
+definition conf_to_translate :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> (addr \<Rightarrow> name set)"
+  where "conf_to_translate s c = (case ((controller s) c) of Some ctrl \<Rightarrow> (\<lambda>addr. conf_to_translate_p1 s (map (fst ctrl)) (irq_nat_decode addr)) | None \<Rightarrow> (\<lambda>_. {}))"
     
 definition mk_node :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> node"
   where "mk_node s c = (case (sys_ctrl_act_conf s c) of None \<Rightarrow> empty_node |
