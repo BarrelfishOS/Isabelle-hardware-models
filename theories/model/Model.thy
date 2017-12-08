@@ -35,18 +35,25 @@ begin
   
 text_raw {* \label{sec:isamodel} *}
 
+
 text "First, we nail down some types.  For ease in getting started, we're using natural numbers for
-  addresses.  It should be possible to use the same definitions to handle finite-length words
-  without much modification."
+  addresses and node identifiers.  It should be possible to use the same definitions to handle 
+  finite-length words without much modification. Furthermore each address is accompained by a 
+  set of properties e.g. whether or not the address is or supports a write. The address is then 
+  a tuple of a natural number with a property set."
+
+datatype property = READ | WRITE | EXECUTE
 
 type_synonym nodeid = nat
-type_synonym addr = nat
+type_synonym addr = "nat \<times> property set"
+
 
 text "A name is a qualified address: which is defined with respect to some context, in this
   case the node at which decoding begins."
   
 type_synonym name = "nodeid \<times> addr"
-  
+
+
 text "A node can accept an input address, in which case resolution terminates here, or it can
   translate it into an input address for another node, or both.  We allow the sets of accepted
   and translated addresses to overlap to model nondeterministic behaviour e.g. a cache, which has a
