@@ -45,7 +45,8 @@ text "First, we nail down some types.  For ease in getting started, we're using 
 datatype property = READ | WRITE | EXECUTE
 
 type_synonym nodeid = nat
-type_synonym addr = "nat \<times> property set"
+type_synonym genaddr = nat
+type_synonym addr = "genaddr \<times> property set"
 
 
 text "A name is a qualified address: which is defined with respect to some context, in this
