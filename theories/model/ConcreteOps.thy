@@ -78,6 +78,7 @@ proof(induct bs, simp add:accept_empty_node)
     thus ?thesis 
       apply(simp add:add_maps_recursive[symmetric])
       apply(simp add: IH mk_map_def direct_map_def mk_block_def add_maps_recursive)
+      apply(auto)
       done
   next
     assume notin: "a \<notin> accept (add_blocks bs empty_node)"
@@ -85,6 +86,7 @@ proof(induct bs, simp add:accept_empty_node)
     thus ?thesis 
       apply(simp add:add_maps_recursive[symmetric])
       apply(simp add:translate_nomap notin mk_map_def direct_map_def mk_block_def add_maps_recursive)
+      apply(auto)
       done
   qed
 qed

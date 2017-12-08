@@ -474,7 +474,10 @@ proof(induct rule:resolve_induct[OF dom])
   next
     fix x::name
     assume xin: "x \<in> ?B"
-    hence "(x, n) \<in> {((nd', a), nd, a) |a. a \<in> accept (net nd)}" by(auto)
+    hence "(x, n) \<in> {((nd', a), nd, a) |a. a \<in> accept (net nd)}"
+      by(force)
+      
+      
     moreover {
       from fresh have dom_x: "resolve_dom (split_node nd nd' net, (nd',snd n))"
         by(auto intro: resolve.domintros

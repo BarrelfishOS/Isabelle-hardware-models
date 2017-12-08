@@ -39,12 +39,23 @@ text {* This is the abstract syntax, corresponding to the concrete sytax introdu
   \autoref{sec:model}.  We do not yet have a parser, and thus models are constructed by hand. *}
 
 text {* A contiguous block of addresses, expressed as a base-limit pair: *}
-type_synonym block_spec = "addr \<times> addr"
+type_synonym block_spec = "(genaddr \<times> genaddr) \<times> property set"
+
+definition block_spec_base :: "block_spec \<Rightarrow> genaddr"
+  where "block_spec_base b = (fst (fst b))"
+
+definition block_spec_limit :: "block_spec \<Rightarrow> genaddr"
+  where "block_spec_limit b = (snd (fst b))"
+
+definition block_spec_props :: "block_spec \<Rightarrow> property set"
+  where "block_spec_props b= (snd b)"
 
 text {* For each syntax item (nonterminal), we have a translation function into the abstract
   semantic model.  Together these define the parse() function of \autoref{sec:reductions}. *}
 definition mk_block :: "block_spec \<Rightarrow> addr set"
-  where "mk_block s = {a. fst s \<le> a \<and> a \<le> snd s}"
+  where "mk_block s = {(a, p). block_spec_base s \<le> a 
+                                \<and> a \<le> block_spec_limit s 
+                                \<and> p = block_spec_props s}"
 
 text {* A single block mapping that maps the specified source block to the given destination
   node, beginning at the given base address: *}
@@ -55,18 +66,22 @@ record map_spec =
 
 text {* Map a block without changing its base address: *}
 definition direct_map :: "block_spec \<Rightarrow> nodeid \<Rightarrow> map_spec"
-  where "direct_map block node = \<lparr> src_block = block, dest_node = node, dest_base = fst block \<rparr>"
+  where "direct_map block node = \<lparr> src_block = block, 
+                                  dest_node = node, 
+                                  dest_base = (block_spec_base block, block_spec_props block) \<rparr>"
 
 definition block_map :: "block_spec \<Rightarrow> nodeid \<Rightarrow> addr \<Rightarrow> map_spec"
   where "block_map block node base = \<lparr> src_block = block, dest_node = node, dest_base = base \<rparr>"
     
 definition one_map :: "addr \<Rightarrow> nodeid \<Rightarrow> addr \<Rightarrow> map_spec"
-  where "one_map src node base = \<lparr> src_block = (src,src), dest_node = node, dest_base = base \<rparr>"
+  where "one_map src node base = \<lparr> src_block = ((fst src, fst src), snd src), 
+                                  dest_node = node, 
+                                  dest_base = base \<rparr>"
 
 definition mk_map :: "map_spec \<Rightarrow> addr \<Rightarrow> name set"
   where "mk_map s =
     (\<lambda>a. if a \<in> mk_block (src_block s)
-      then {(dest_node s, dest_base s + (a - fst (src_block s)))}
+      then {(dest_node s, (fst (dest_base s) + ((fst a) - block_spec_base (src_block s))), (snd (dest_base s)))}
       else {})"
 
 text {* A finitely-specified decoding node, with a list of blocks to accept locally, and a
@@ -330,7 +345,7 @@ proof(induct ss, simp_all add:wf_base)
   hence "finite (accept (add_blocks ss node))" "\<And>s. finite (translate (add_blocks ss node) s)"
     by(auto simp:wf_node_def)
   moreover have "finite (mk_block s)"
-    unfolding mk_block_def by(auto)
+    unfolding mk_block_def by(auto simp:block_spec_base_def block_spec_limit_def block_spec_props_def)
   ultimately show "wf_node (accept_update (op \<union> (mk_block s)) (add_blocks ss node))"
     by(auto intro:wf_nodeI)
 qed
