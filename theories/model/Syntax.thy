@@ -55,7 +55,10 @@ text {* For each syntax item (nonterminal), we have a translation function into 
 definition mk_block :: "block_spec \<Rightarrow> addr set"
   where "mk_block s = {(a, p). block_spec_base s \<le> a 
                                 \<and> a \<le> block_spec_limit s 
-                                \<and> p = block_spec_props s}"
+                                \<and> p = block_spec_props s }"
+
+
+
 
 text {* A single block mapping that maps the specified source block to the given destination
   node, beginning at the given base address: *}
@@ -336,6 +339,23 @@ lemma wf_overlay:
   "wf_node (mk_overlay s)"
   unfolding mk_overlay_def by(cases s, simp_all add:wf_node_def)
 
+
+lemma finite_mk_block:
+"finite (mk_block s)"
+proof -
+  have sep: "\<And>s. mk_block s = ({a . block_spec_base s \<le> a 
+                      \<and> a \<le> block_spec_limit s}) \<times> {(block_spec_props s)}"
+    by(auto simp:mk_block_def)
+
+  have finProps : "finite {(block_spec_props s)}"
+    by(auto)
+  have finAddrs : "finite ({a . block_spec_base s \<le> a 
+                      \<and> a \<le> block_spec_limit s})"
+    by(auto)
+  from sep finProps finAddrs show ?thesis
+    by(auto)
+qed
+
 lemma wf_add_blocks:
   assumes wf_base: "wf_node node"
   shows "wf_node (add_blocks ss node)"
@@ -345,7 +365,7 @@ proof(induct ss, simp_all add:wf_base)
   hence "finite (accept (add_blocks ss node))" "\<And>s. finite (translate (add_blocks ss node) s)"
     by(auto simp:wf_node_def)
   moreover have "finite (mk_block s)"
-    unfolding mk_block_def by(auto simp:block_spec_base_def block_spec_limit_def block_spec_props_def)
+    by(simp add: finite_mk_block)
   ultimately show "wf_node (accept_update (op \<union> (mk_block s)) (add_blocks ss node))"
     by(auto intro:wf_nodeI)
 qed

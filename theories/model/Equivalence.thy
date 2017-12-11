@@ -277,7 +277,7 @@ definition fresh_node :: "net \<Rightarrow> nodeid \<Rightarrow> bool"
 
 (*<*)
 lemma fresh_node_translateD: "\<And>net nd a. fresh_node net nd \<Longrightarrow> translate (net nd) a = {}"
-  by(simp add:fresh_node_def)
+  by(auto simp:fresh_node_def)
 lemma fresh_node_reachableD: "\<And>net nd x y. fresh_node net nd \<Longrightarrow> (x,y) \<in> decodes_to net \<Longrightarrow> fst x \<noteq> nd"
   unfolding fresh_node_def by(blast)
 lemma fresh_node_acceptD: "\<And>net nd. fresh_node net nd \<Longrightarrow> accept (net nd) = {}"
