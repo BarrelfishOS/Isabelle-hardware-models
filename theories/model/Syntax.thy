@@ -28,81 +28,120 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (*<*)
 theory Syntax
-  imports Equivalence Resolution
+  imports Equivalence Resolution Model
 begin
 (*>*)
   
 subsection {* Abstract Syntax for Nets *}
 text_raw {* \label{sec:isasyntax} *}
 
-text {* This is the abstract syntax, corresponding to the concrete sytax introduced in
-  \autoref{sec:model}.  We do not yet have a parser, and thus models are constructed by hand. *}
+text {* This is the abstract syntax, corresponding to the concrete sytax 
+        introduced in \autoref{sec:model}.  We do not yet have a parser, and 
+        thus models are constructed by hand. *}
 
 text {* A contiguous block of addresses, expressed as a base-limit pair: *}
-type_synonym block_spec = "(genaddr \<times> genaddr) \<times> property set"
 
-definition block_spec_base :: "block_spec \<Rightarrow> genaddr"
-  where "block_spec_base b = (fst (fst b))"
+record block_spec = 
+  base    :: genaddr
+  limit   :: genaddr
+  require :: "property set"
+  forbid  :: "property set"
 
-definition block_spec_limit :: "block_spec \<Rightarrow> genaddr"
-  where "block_spec_limit b = (snd (fst b))"
 
-definition block_spec_props :: "block_spec \<Rightarrow> property set"
-  where "block_spec_props b= (snd b)"
+text {* For each syntax item (nonterminal), we have a translation function into
+        the abstract semantic model.  Together these define the parse() function 
+        of \autoref{sec:reductions}. *}
 
-text {* For each syntax item (nonterminal), we have a translation function into the abstract
-  semantic model.  Together these define the parse() function of \autoref{sec:reductions}. *}
+
 definition mk_block :: "block_spec \<Rightarrow> addr set"
-  where "mk_block s = {(a, p). block_spec_base s \<le> a 
-                                \<and> a \<le> block_spec_limit s 
-                                \<and> p = block_spec_props s }"
+  where "mk_block s = {(a, p) | a p. (base s) \<le> a \<and> a \<le> (limit s) 
+                                \<and> (\<forall>p'\<in> p. p'\<notin> (forbid s))
+                                \<and> (\<forall>p'\<in> (require s). p' \<in> p) }"
 
 
+text {* A single block mapping that maps the specified source block to the given 
+        destination node, beginning at the given base address: *}
 
 
-text {* A single block mapping that maps the specified source block to the given destination
-  node, beginning at the given base address: *}
 record map_spec =
   src_block :: block_spec
   dest_node :: nodeid
-  dest_base :: addr
+  dest_base :: genaddr
+  propadd   :: "property set"
+  propstrip :: "property set"
+
 
 text {* Map a block without changing its base address: *}
-definition direct_map :: "block_spec \<Rightarrow> nodeid \<Rightarrow> map_spec"
-  where "direct_map block node = \<lparr> src_block = block, 
-                                  dest_node = node, 
-                                  dest_base = (block_spec_base block, block_spec_props block) \<rparr>"
 
-definition block_map :: "block_spec \<Rightarrow> nodeid \<Rightarrow> addr \<Rightarrow> map_spec"
-  where "block_map block node base = \<lparr> src_block = block, dest_node = node, dest_base = base \<rparr>"
-    
-definition one_map :: "addr \<Rightarrow> nodeid \<Rightarrow> addr \<Rightarrow> map_spec"
-  where "one_map src node base = \<lparr> src_block = ((fst src, fst src), snd src), 
-                                  dest_node = node, 
-                                  dest_base = base \<rparr>"
+definition block_map :: "block_spec \<Rightarrow> nodeid \<Rightarrow> genaddr \<Rightarrow> map_spec"
+  where "block_map blk nd ba = \<lparr> src_block = blk, dest_node = nd, dest_base = ba,
+                                 propadd = {}, propstrip = {} \<rparr>"
+
+definition block_map_p :: "block_spec \<Rightarrow> nodeid \<Rightarrow> genaddr \<Rightarrow> property list 
+                                        \<Rightarrow> property list \<Rightarrow> map_spec"
+  where "block_map_p blk nd ba pa ps  = \<lparr> src_block = blk, dest_node = nd, 
+                                          dest_base = ba, propadd = set pa,
+                                          propstrip = set ps \<rparr>"
+
+
+definition direct_map :: "block_spec \<Rightarrow> nodeid \<Rightarrow> map_spec"
+  where "direct_map blk nd = \<lparr> src_block = blk, dest_node = nd, 
+                              dest_base = (base blk),
+                              propadd = {}, propstrip = {} \<rparr>"
+
+definition direct_map_p :: "block_spec \<Rightarrow> nodeid \<Rightarrow> property list 
+                                       \<Rightarrow> property list \<Rightarrow> map_spec"
+  where "direct_map_p blk nd pa ps = \<lparr> src_block = blk, dest_node = nd, 
+                                      dest_base = (base blk),
+                                      propadd = set pa, propstrip = set ps \<rparr>"
+
+
+definition one_map :: "addr \<Rightarrow> nodeid \<Rightarrow> genaddr \<Rightarrow> map_spec"
+  where "one_map src nd ba =  \<lparr> src_block = \<lparr> base = (fst src), limit = (fst src), 
+                                             require = (snd src), forbid = {} \<rparr>,
+                               dest_node = nd, dest_base = ba,
+                               propadd = {},propstrip = {} \<rparr>"
+
+definition one_map_p :: "addr \<Rightarrow> nodeid \<Rightarrow> genaddr \<Rightarrow> property list
+                              \<Rightarrow> property list \<Rightarrow> map_spec"
+  where "one_map_p src nd ba pa ps =  \<lparr> src_block = \<lparr> base = (fst src), 
+                                                     limit = (fst src), 
+                                                     require = (snd src), 
+                                                     forbid = {} \<rparr>,
+                                       dest_node = nd, dest_base = ba,
+                                       propadd = set pa,propstrip = set ps \<rparr>"
+
 
 definition mk_map :: "map_spec \<Rightarrow> addr \<Rightarrow> name set"
   where "mk_map s =
     (\<lambda>a. if a \<in> mk_block (src_block s)
-      then {(dest_node s, (fst (dest_base s) + ((fst a) - block_spec_base (src_block s))), (snd (dest_base s)))}
+      then {
+        (dest_node s, (dest_base s + (fst a - base (src_block s))), 
+                         (snd a) \<union> (propadd s) - (propstrip s)) }
       else {})"
 
-text {* A finitely-specified decoding node, with a list of blocks to accept locally, and a
-  list of those to translate: *}
+
+text {* A finitely-specified decoding node, with a list of blocks to accept 
+        locally, and a list of those to translate: *}
+
 record node_spec =
   acc_blocks :: "block_spec list"
   map_blocks :: "map_spec list"
   overlay    :: "nodeid option"
 
+
 definition empty_spec :: "node_spec"
   where "empty_spec = \<lparr> acc_blocks = [], map_blocks = [], overlay = None \<rparr>"
+
 (*<*)
 lemma acc_blocks_empty:
   "acc_blocks empty_spec = []"
   by(simp add:empty_spec_def)
 (*>*)
-text {* If an overlay node is specified, initialise the map by forwarding all addresses to that
-  node: *}
+
+text {* If an overlay node is specified, initialise the map by forwarding all
+        addresses to that  node: *}
+
 definition mk_overlay :: "nodeid option \<Rightarrow> node"
   where "mk_overlay ov = \<lparr>
           accept = {},
@@ -116,7 +155,8 @@ lemma accept_mk_overlay:
 
 primrec add_blocks :: "block_spec list \<Rightarrow> node \<Rightarrow> node"
   where "add_blocks [] node = node" |
-        "add_blocks (s#ss) node = accept_update (op \<union> (mk_block s)) (add_blocks ss node)"
+        "add_blocks (s#ss) node = accept_update (op \<union> (mk_block s)) 
+                                                (add_blocks ss node)"
 
 (*<*)
 lemma translate_add_blocks:
@@ -130,19 +170,28 @@ lemma add_blocks_overlay:
 (*>*)
 
 definition add_maps :: "map_spec list \<Rightarrow> node \<Rightarrow> node"
-  where "add_maps ss node = translate_update (\<lambda>t a. \<Union>{mk_map s a |s. s\<in>(set ss) } \<union> t a) node"
+  where "add_maps ss node = translate_update 
+                                (\<lambda>t a. \<Union>{mk_map s a |s. s\<in>(set ss) } \<union> t a) 
+                                node"
     
 primrec add_maps_rec :: "map_spec list \<Rightarrow> node \<Rightarrow> node"
   where "add_maps_rec [] node = node" |
-        "add_maps_rec (s#ss) node = translate_update (\<lambda>t a. mk_map s a \<union> t a) (add_maps_rec ss node)"    
+        "add_maps_rec (s#ss) node = translate_update 
+                                      (\<lambda>t a. mk_map s a \<union> t a) 
+                                      (add_maps_rec ss node)"    
+
 
 definition remove_maps :: "map_spec list \<Rightarrow> node \<Rightarrow> node"
-  where "remove_maps ss node = translate_update (\<lambda>t a. t a - \<Union>{mk_map s a |s. s\<in>(set ss) }) node"
+  where "remove_maps ss node = translate_update 
+                                   (\<lambda>t a. t a - \<Union>{mk_map s a |s. s\<in>(set ss) }) 
+                                    node"
 
-lemma remove_maps_set_diff: "A - \<Union>{mk_map s a |s. s \<in> set ms \<or> s \<in> set ns} =
-                             A - \<Union>{mk_map s a |s. s \<in> set ns} - \<Union>{mk_map s a |s. s \<in> set ms}"
+lemma remove_maps_set_diff: 
+  "A - \<Union>{mk_map s a |s. s \<in> set ms \<or> s \<in> set ns} 
+    = A - \<Union>{mk_map s a |s. s \<in> set ns} - \<Union>{mk_map s a |s. s \<in> set ms}"
   by(auto)      
-    
+
+
 lemma remove_maps_append :
   "remove_maps (ms @ ns) node = remove_maps ms (remove_maps ns node)"
   by(auto simp add:remove_maps_def o_def remove_maps_set_diff)    
@@ -156,14 +205,16 @@ definition remove_one_map :: "map_spec \<Rightarrow> node \<Rightarrow> node"
     
 definition update_one_map :: "map_spec \<Rightarrow> map_spec \<Rightarrow> node \<Rightarrow> node"
   where "update_one_map m m' n = add_one_map m' (remove_one_map m n)"        
-        
+
+
 lemma update_commute:
   assumes m_distinct: "\<And>a. translate node a \<inter> mk_map m a = {}"
       and n_contained: "\<And>a. mk_map n a \<subseteq> translate node a"
   shows "update_one_map m n (update_one_map n m node) = node"
 proof -
   have "\<And>a. translate node a - mk_map n a \<subseteq> translate node a" by(auto)
-  hence "\<And>a. (translate node a - mk_map n a) \<inter> mk_map m a \<subseteq> translate node a \<inter> mk_map m a"
+  hence "\<And>a. (translate node a - mk_map n a) \<inter> mk_map m a 
+                    \<subseteq> translate node a \<inter> mk_map m a"
     by(auto)
   also note m_distinct
   finally have "\<And>a.(translate node a - mk_map n a) \<inter> mk_map m a = {}" by(auto)
@@ -172,45 +223,38 @@ proof -
              translate node a - mk_map n a"
     by(simp add:Diff_triv)
   with n_contained show ?thesis
-    by(simp add:update_one_map_def add_one_map_def remove_one_map_def o_def Un_Diff Un_absorb1)
+    by(simp add:update_one_map_def add_one_map_def remove_one_map_def o_def 
+                Un_Diff Un_absorb1)
 qed    
     
-lemma mk_map_set_append : "mk_map a aa \<union> \<Union>{mk_map s aa |s. s \<in> set ss} = \<Union>{mk_map s aa |s. s \<in> set (a # ss)}"
+lemma mk_map_set_append : 
+  "mk_map a aa \<union> \<Union>{mk_map s aa |s. s \<in> set ss} 
+     = \<Union>{mk_map s aa |s. s \<in> set (a # ss)}"
   by(auto)
 
-lemma mk_map_set_commute : "mk_map a aa \<union> (\<Union>{mk_map s aa |s. s \<in> set ss}\<union> t aa) = \<Union>{mk_map s aa |s. s \<in> set (a # ss)} \<union> t aa"
+lemma mk_map_set_commute : 
+  "mk_map a aa \<union> (\<Union>{mk_map s aa |s. s \<in> set ss}\<union> t aa)
+     = \<Union>{mk_map s aa |s. s \<in> set (a # ss)} \<union> t aa"
   by(auto)
     
 lemma translate_update_append: 
-   "translate_update (\<lambda>t aa. \<Union>{mk_map s aa |s. s \<in> set (a # ss)} \<union> t aa) node = 
-    translate_update (\<lambda>t aa. mk_map a aa \<union> (\<Union>{mk_map s aa |s. s \<in> set (ss)}) \<union> t aa) node"
+  "translate_update (\<lambda>t aa. \<Union>{mk_map s aa |s. s \<in> set (a # ss)} \<union> t aa) node = 
+  translate_update (\<lambda>t aa. mk_map a aa \<union> (\<Union>{mk_map s aa |s. s \<in> set (ss)}) \<union> t aa) node"
   by(simp add:mk_map_set_append)
 
 lemma translate_update_commute:  
-   "translate_update (\<lambda>t aa. \<Union>{mk_map s aa |s. s \<in> set (a # ss)} \<union> t aa) node = 
-    translate_update (\<lambda>t aa. mk_map a aa \<union> ((\<Union>{mk_map s aa |s. s \<in> set (ss)}) \<union> t aa)) node"
+  "translate_update (\<lambda>t aa. \<Union>{mk_map s aa |s. s \<in> set (a # ss)} \<union> t aa) node = 
+  translate_update (\<lambda>t aa. mk_map a aa \<union> ((\<Union>{mk_map s aa |s. s \<in> set (ss)}) \<union> t aa)) node"
   by(subst mk_map_set_commute, auto)
     
-
+                                                           
 lemma add_maps_recursive:
-   "add_maps_rec ss node = add_maps ss node"
+  "add_maps_rec ss node = add_maps ss node"
   apply(induct ss)
-  apply(simp_all add:add_maps_def add_maps_rec_def)
-  apply(simp_all add: o_def)
+  apply(simp_all add:add_maps_def add_maps_rec_def o_def)
   apply(simp add:translate_update_commute[symmetric])
   done
 
-    
-(*     
-        
-lemma add_maps_set : 
-   "add_maps ss node = translate_update (\<lambda>t a. \<Union>{mk_map s a |s. s\<in>(set ss) } \<union> t a) node"
-   apply(induct ss)
-   apply(simp_all add: o_def)
-   apply(simp add:translate_update_commute[symmetric])
-   done
-   
-*)
 
 (*<*)
 lemma accept_add_maps:
@@ -237,7 +281,6 @@ lemma add_maps_append_direct:
    "add_maps ms (add_maps ns node) = 
     translate_update (\<lambda>t a. \<Union>{mk_map s a |s. s\<in>(set (ms @ ns)) } \<union> t a) node" 
   by(simp add:add_maps_def o_def Un_assoc[symmetric] add_maps_set_union)
-    
     
 lemma add_maps_append:
   "add_maps (ms @ ns) node = add_maps ms (add_maps ns node)"
@@ -269,12 +312,13 @@ lemma add_maps_append_commute:
    "add_maps a (add_maps b node) = add_maps b (add_maps a node)"
   by(simp add:add_maps_append[symmetric] add_maps_commute)
   
-    
-
 (*>*)
 
+
 definition mk_node :: "node_spec \<Rightarrow> node"
-  where "mk_node s = add_maps (map_blocks s) (add_blocks (acc_blocks s) (mk_overlay (overlay s)))"
+  where "mk_node s = add_maps (map_blocks s) 
+                              (add_blocks (acc_blocks s) 
+                              (mk_overlay (overlay s)))"
 
 (*<*)
 lemma accept_mk_node:
@@ -285,20 +329,24 @@ lemma maps_blocks_comm:
   "add_maps ms (add_blocks bs node) = add_blocks bs (add_maps ms node)"
 proof(simp only: add_maps_recursive[symmetric], induct ms, simp_all)
   fix m ms
-  assume IH: "add_maps_rec ms (add_blocks bs node) = add_blocks bs (add_maps_rec ms node)"
+  assume IH: "add_maps_rec ms (add_blocks bs node) 
+                  = add_blocks bs (add_maps_rec ms node)"
 
   have tu_au_comm:
     "\<And>f g node. translate_update f (accept_update g node) =
                 accept_update g (translate_update f node)"
     by(simp)
 
-  show "translate_update (\<lambda>t a. mk_map m a \<union> t a) (add_blocks bs (add_maps_rec ms node)) =
-        add_blocks bs (translate_update (\<lambda>t a. mk_map m a \<union> t a) (add_maps_rec ms node))"
+  show "translate_update (\<lambda>t a. mk_map m a \<union> t a) 
+                         (add_blocks bs (add_maps_rec ms node)) =
+        add_blocks bs (translate_update (\<lambda>t a. mk_map m a \<union> t a) 
+                                        (add_maps_rec ms node))"
     by(induct bs, simp_all add:tu_au_comm)
 qed
 
 lemma translate_mk_node:
-  "translate (mk_node s) = translate (add_maps (map_blocks s) (mk_overlay (overlay s)))"
+  "translate (mk_node s) = translate (add_maps (map_blocks s) 
+                                     (mk_overlay (overlay s)))"
   by(simp add:mk_node_def maps_blocks_comm translate_add_blocks)
 (*>*)
 
@@ -307,12 +355,13 @@ type_synonym net_spec = "(nodeid \<times> node_spec) list"
 definition "empty_net = (\<lambda>_. empty_node)"
 
 primrec repeat_node :: "node_spec \<Rightarrow> nodeid \<Rightarrow> nat \<Rightarrow> net_spec"
-  where "repeat_node node base 0 = []" |
-        "repeat_node node base (Suc n) = (base, node) # repeat_node node (Suc base) n"
+  where "repeat_node node ba 0 = []" |
+        "repeat_node node ba (Suc n) = (ba, node) # repeat_node node (Suc ba) n"
 
 primrec mk_net :: "net_spec \<Rightarrow> net"
   where "mk_net [] = empty_net" |
         "mk_net (s#ss) = (mk_net ss)(fst s := mk_node (snd s))"
+
 (*<*)
 lemma map_blocks_empty_spec:
   "map_blocks empty_spec = []"
@@ -329,7 +378,8 @@ lemma wf_nodeI:
 
 lemma wf_node_wf_net:
   "(\<And>nd. wf_node (net nd)) \<Longrightarrow> wf_net net"
-  unfolding wf_node_def wf_net_def by(auto simp:Image_def decodes_to_def decode_step_def)
+  unfolding wf_node_def wf_net_def 
+  by(auto simp:Image_def decodes_to_def decode_step_def)
 
 lemma wf_empty_node:
   "wf_node empty_node"
@@ -343,14 +393,15 @@ lemma wf_overlay:
 lemma finite_mk_block:
 "finite (mk_block s)"
 proof -
-  have sep: "\<And>s. mk_block s = ({a . block_spec_base s \<le> a 
-                      \<and> a \<le> block_spec_limit s}) \<times> {(block_spec_props s)}"
+  have sep: "\<And>s. mk_block s = ({a . base s \<le> a 
+                      \<and> a \<le> limit s}) \<times> {p | p . (\<forall>p'\<in> p. p'\<notin> (forbid s))
+                                \<and> (\<forall>p'\<in> (require s). p' \<in> p)}"
     by(auto simp:mk_block_def)
 
-  have finProps : "finite {(block_spec_props s)}"
+  have finProps : "finite  {p | p . (\<forall>p'\<in> p. p'\<notin> (forbid s))
+                                \<and> (\<forall>p'\<in> (require s). p' \<in> p)}"
     by(auto)
-  have finAddrs : "finite ({a . block_spec_base s \<le> a 
-                      \<and> a \<le> block_spec_limit s})"
+  have finAddrs : "finite ({a . base s \<le> a \<and> a \<le> limit s})"
     by(auto)
   from sep finProps finAddrs show ?thesis
     by(auto)
