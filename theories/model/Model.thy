@@ -42,10 +42,10 @@ text "First, we nail down some types.  For ease in getting started, we're using 
   set of properties e.g. whether or not the address is or supports a write. The address is then 
   a tuple of a natural number with a property set."
 
-datatype property = READ | WRITE | EXECUTE
-
 type_synonym nodeid = nat
 type_synonym genaddr = nat
+type_synonym property = nat
+
 type_synonym addr = "genaddr \<times> property set"
 
 
@@ -63,7 +63,7 @@ text "A node can accept an input address, in which case resolution terminates he
   at which a given input address might be accepted."
 
 record node =
-  accept :: "addr set"
+  accept    :: "addr set"
   translate :: "addr \<Rightarrow> name set"
 
   (*<*)
