@@ -44,35 +44,14 @@ text {* A contiguous block of addresses, expressed as a base-limit pair: *}
 record block_spec = 
   base    :: genaddr
   limit   :: genaddr
-  require :: "property set"
-  forbid  :: "property set"
+  require :: "property list"
+  forbid  :: "property list"
 
 definition block :: "genaddr \<Rightarrow> genaddr \<Rightarrow> property list \<Rightarrow> property list \<Rightarrow> block_spec"
-  where "block b l r f  = \<lparr> base = b, limit = l, require = set r, forbid = set f \<rparr>"
+  where "block b l r f  = \<lparr> base = b, limit = l, require = r, forbid = f \<rparr>"
 
 definition blockn :: "genaddr \<Rightarrow> genaddr \<Rightarrow> block_spec"
-  where "blockn b l  = \<lparr> base = b, limit = l, require = {}, forbid = {} \<rparr>"
-
-
-definition wf_block :: "block_spec \<Rightarrow> bool"
-  where "wf_block b \<longleftrightarrow> finite (require b) \<and> finite (forbid b)"
-
-lemma "wf_block (block b l r f)"
-  by(simp add:wf_block_def block_def)
-
-lemma "(\<exists>N. (\<forall>p\<in>(require B). p < N) \<and> (\<forall>p\<in>(forbid B). p < N)) \<longleftrightarrow> 
-        (\<exists>N. (\<forall>p\<in>((require B) \<union> (forbid B)). p < N))"
-  by(auto)
-
-lemma "\<And>B. wf_block B \<longleftrightarrow>  (\<exists>N. (\<forall>p\<in>((require B) \<union> (forbid B)). p < N))"
-proof -
-  have fin: "\<And>B. wf_block B \<longleftrightarrow> finite ((require B) \<union> (forbid B))"
-    by(auto simp:wf_block_def)
-  have bound: "\<And>B. finite ((require B) \<union> (forbid B)) \<longleftrightarrow> (\<exists>N. (\<forall>p\<in>((require B) \<union> (forbid B)). p < N))"
-    by(auto simp:Set_Interval.finite_nat_set_iff_bounded)
-  from fin bound show "\<And>B. wf_block B \<longleftrightarrow>  (\<exists>N. (\<forall>p\<in>((require B) \<union> (forbid B)). p < N))"
-    by(auto)
-qed
+  where "blockn b l  = \<lparr> base = b, limit = l, require = [], forbid = [] \<rparr>"
 
 
 
@@ -85,10 +64,9 @@ definition prop_pred :: "property set \<Rightarrow> property set \<Rightarrow> p
   where "prop_pred incl excl props =  (excl \<inter> props = {}  \<and> incl \<subseteq> props)"
 
 
-
 definition mk_block :: "block_spec \<Rightarrow> addr set"
   where "mk_block s = {(a, p) | a p. (base s) \<le> a \<and> a \<le> (limit s) 
-                                \<and> prop_pred (require s) (forbid s) p }"
+                                \<and> prop_pred (set (require s)) (set (forbid s)) p }"
 
 lemma "\<forall>P. \<exists>I. prop_pred A B P \<longleftrightarrow> prop_pred A B (P-I)"
   by(auto simp:prop_pred_def)
@@ -109,49 +87,49 @@ record map_spec =
   src_block :: block_spec
   dest_node :: nodeid
   dest_base :: genaddr
-  propadd   :: "property set"
-  propstrip :: "property set"
+  propadd   :: "property list"
+  propstrip :: "property list"
 
 
 text {* Map a block without changing its base address: *}
 
 definition block_map :: "block_spec \<Rightarrow> nodeid \<Rightarrow> genaddr \<Rightarrow> map_spec"
   where "block_map blk nd ba = \<lparr> src_block = blk, dest_node = nd, dest_base = ba,
-                                 propadd = {}, propstrip = {} \<rparr>"
+                                 propadd = [], propstrip = [] \<rparr>"
 
 definition block_map_p :: "block_spec \<Rightarrow> nodeid \<Rightarrow> genaddr \<Rightarrow> property list 
                                         \<Rightarrow> property list \<Rightarrow> map_spec"
   where "block_map_p blk nd ba pa ps  = \<lparr> src_block = blk, dest_node = nd, 
-                                          dest_base = ba, propadd = set pa,
-                                          propstrip = set ps \<rparr>"
+                                          dest_base = ba, propadd = pa,
+                                          propstrip = ps \<rparr>"
 
 
 definition direct_map :: "block_spec \<Rightarrow> nodeid \<Rightarrow> map_spec"
   where "direct_map blk nd = \<lparr> src_block = blk, dest_node = nd, 
                               dest_base = (base blk),
-                              propadd = {}, propstrip = {} \<rparr>"
+                              propadd = [], propstrip = [] \<rparr>"
 
 definition direct_map_p :: "block_spec \<Rightarrow> nodeid \<Rightarrow> property list 
                                        \<Rightarrow> property list \<Rightarrow> map_spec"
   where "direct_map_p blk nd pa ps = \<lparr> src_block = blk, dest_node = nd, 
                                       dest_base = (base blk),
-                                      propadd = set pa, propstrip = set ps \<rparr>"
+                                      propadd =  pa, propstrip =  ps \<rparr>"
 
 
 definition one_map :: "addr \<Rightarrow> nodeid \<Rightarrow> genaddr \<Rightarrow> map_spec"
   where "one_map src nd ba =  \<lparr> src_block = \<lparr> base = (fst src), limit = (fst src), 
-                                             require = (snd src), forbid = {} \<rparr>,
+                                             require = [], forbid = [] \<rparr>,
                                dest_node = nd, dest_base = ba,
-                               propadd = {},propstrip = {} \<rparr>"
+                               propadd =[],propstrip = [] \<rparr>"
 
 definition one_map_p :: "addr \<Rightarrow> nodeid \<Rightarrow> genaddr \<Rightarrow> property list
                               \<Rightarrow> property list \<Rightarrow> map_spec"
   where "one_map_p src nd ba pa ps =  \<lparr> src_block = \<lparr> base = (fst src), 
                                                      limit = (fst src), 
-                                                     require = (snd src), 
-                                                     forbid = {} \<rparr>,
+                                                     require = [], 
+                                                     forbid = [] \<rparr>,
                                        dest_node = nd, dest_base = ba,
-                                       propadd = set pa,propstrip = set ps \<rparr>"
+                                       propadd =  pa,propstrip =  ps \<rparr>"
 
 
 definition mk_map :: "map_spec \<Rightarrow> addr \<Rightarrow> name set"
@@ -159,7 +137,7 @@ definition mk_map :: "map_spec \<Rightarrow> addr \<Rightarrow> name set"
     (\<lambda>a. if a \<in> mk_block (src_block s)
       then {
         (dest_node s, (dest_base s + (fst a - base (src_block s))), 
-                         (snd a) \<union> (propadd s) - (propstrip s)) }
+                         (snd a) \<union> (set (propadd s)) - (set (propstrip s))) }
       else {})"
 
 
@@ -641,6 +619,103 @@ proof(induct s, simp_all)
   qed
 qed
 (*>*)
+
+
+subsection "Finiteness of Properties"
+
+primrec block_prop_set :: "block_spec list \<Rightarrow> property set"
+  where "block_prop_set [] = {}" |
+        "block_prop_set (m#mm) = (block_prop_set mm) \<union> set (require m) \<union> set (forbid m)"
+
+lemma block_prop_set_finite :
+"finite (block_prop_set m)"
+  apply(induct m)
+  apply(simp_all add:block_prop_set_def)
+  done
+
+primrec map_prop_set :: "map_spec list \<Rightarrow> property set"
+  where "map_prop_set [] = {}" |
+        "map_prop_set (m#mm) = (map_prop_set mm) \<union> set (propadd m) \<union> set (propstrip m)"
+
+lemma map_prop_set_finite:
+"finite (map_prop_set m)"
+  apply(induct m)
+  apply(simp_all add:map_prop_set_def)
+  done
+
+definition node_prop_set :: "node_spec \<Rightarrow> property set"
+  where "node_prop_set n = map_prop_set (map_blocks n) \<union> block_prop_set (acc_blocks n)"
+
+lemma node_prop_set_finite:
+"finite (node_prop_set n)"
+  by(simp add:node_prop_set_def map_prop_set_finite block_prop_set_finite)
+
+primrec net_prop_set :: "net_spec \<Rightarrow> property set"
+  where "net_prop_set [] = {}" |
+        "net_prop_set (s#ss) = (net_prop_set ss) \<union> (node_prop_set (snd s))"
+
+lemma net_prop_set_finite:
+"finite (net_prop_set n)"
+  apply(induct n)
+  apply(simp_all add:node_prop_set_finite net_prop_set_def)
+  done
+
+lemma "\<exists>N. (net_prop_set n) \<subseteq> {..<N} "
+proof -
+  have fin: "finite (net_prop_set n)"
+    by(simp add: net_prop_set_finite)
+
+  from fin have pred: "\<exists>k. \<forall>p\<in>(net_prop_set n). p < k"
+    by(auto simp: Set_Interval.finite_nat_set_iff_bounded)
+
+  from pred show ?thesis
+    by(auto)  
+qed
+
+
+definition mk_block2 :: "property set \<Rightarrow> block_spec \<Rightarrow> addr set"
+  where "mk_block2 ps s = {(a, p) | a p. (base s) \<le> a \<and> a \<le> (limit s) 
+                                \<and> prop_pred (set (require s)) (set (forbid s)) p
+                                \<and> p \<subseteq> ps }"
+lemma 
+  assumes psfini: "finite ps"
+  shows "finite (mk_block2 ps s)"
+proof -
+  have sep: "{(a, p) | a p. (base s) \<le> a \<and> a \<le> (limit s) 
+               \<and> prop_pred (set (require s)) (set (forbid s)) p
+               \<and> p \<subseteq> ps } = {a.(base s) \<le> a \<and> a \<le> (limit s) } \<times>
+                  {p. prop_pred (set (require s)) (set (forbid s)) p
+               \<and> p \<subseteq> ps}"
+    by(auto)
+  have fina: "finite {a.(base s) \<le> a \<and> a \<le> (limit s) }"
+    by(auto)
+  from psfini have finb: "finite {p. prop_pred (set (require s)) (set (forbid s)) p
+               \<and> p \<subseteq> ps}"
+    by(auto)
+
+  from finb fina sep show ?thesis 
+    by(auto simp: mk_block2_def )
+qed
+    
+
+primrec add_blocks2 :: "property set \<Rightarrow> block_spec list \<Rightarrow> node \<Rightarrow> node"
+  where "add_blocks2 ps [] node = node" |
+        "add_blocks2 ps (s#ss) node = accept_update (op \<union> (mk_block s)) 
+                                                (add_blocks2 ps  ss node)"
+
+definition mk_node2 :: "property set \<Rightarrow> node_spec \<Rightarrow> node"
+  where "mk_node2 ps s = add_maps (map_blocks s) 
+                         (add_blocks2 ps (acc_blocks s) 
+                         (mk_overlay (overlay s)))"
+
+primrec mk_net_step :: "property set \<Rightarrow> net_spec \<Rightarrow> net"
+  where "mk_net_step ps [] = empty_net" |
+        "mk_net_step ps (s#ss) = (mk_net_step ps ss)(fst s := mk_node2 ps (snd s))"
+
+definition mk_net2 :: "net_spec \<Rightarrow> net"
+  where "mk_net2 ns = mk_net_step (net_prop_set ns) ns"
+
+
 
 (*<*)
 end
