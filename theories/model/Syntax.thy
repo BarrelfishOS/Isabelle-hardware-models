@@ -47,16 +47,58 @@ record block_spec =
   require :: "property set"
   forbid  :: "property set"
 
+definition block :: "genaddr \<Rightarrow> genaddr \<Rightarrow> property list \<Rightarrow> property list \<Rightarrow> block_spec"
+  where "block b l r f  = \<lparr> base = b, limit = l, require = set r, forbid = set f \<rparr>"
+
+definition blockn :: "genaddr \<Rightarrow> genaddr \<Rightarrow> block_spec"
+  where "blockn b l  = \<lparr> base = b, limit = l, require = {}, forbid = {} \<rparr>"
+
+
+definition wf_block :: "block_spec \<Rightarrow> bool"
+  where "wf_block b \<longleftrightarrow> finite (require b) \<and> finite (forbid b)"
+
+lemma "wf_block (block b l r f)"
+  by(simp add:wf_block_def block_def)
+
+lemma "(\<exists>N. (\<forall>p\<in>(require B). p < N) \<and> (\<forall>p\<in>(forbid B). p < N)) \<longleftrightarrow> 
+        (\<exists>N. (\<forall>p\<in>((require B) \<union> (forbid B)). p < N))"
+  by(auto)
+
+lemma "\<And>B. wf_block B \<longleftrightarrow>  (\<exists>N. (\<forall>p\<in>((require B) \<union> (forbid B)). p < N))"
+proof -
+  have fin: "\<And>B. wf_block B \<longleftrightarrow> finite ((require B) \<union> (forbid B))"
+    by(auto simp:wf_block_def)
+  have bound: "\<And>B. finite ((require B) \<union> (forbid B)) \<longleftrightarrow> (\<exists>N. (\<forall>p\<in>((require B) \<union> (forbid B)). p < N))"
+    by(auto simp:Set_Interval.finite_nat_set_iff_bounded)
+  from fin bound show "\<And>B. wf_block B \<longleftrightarrow>  (\<exists>N. (\<forall>p\<in>((require B) \<union> (forbid B)). p < N))"
+    by(auto)
+qed
+
+
 
 text {* For each syntax item (nonterminal), we have a translation function into
         the abstract semantic model.  Together these define the parse() function 
         of \autoref{sec:reductions}. *}
 
 
+definition prop_pred :: "property set \<Rightarrow> property set \<Rightarrow> property set \<Rightarrow> bool"
+  where "prop_pred incl excl props =  (excl \<inter> props = {}  \<and> incl \<subseteq> props)"
+
+
+
 definition mk_block :: "block_spec \<Rightarrow> addr set"
   where "mk_block s = {(a, p) | a p. (base s) \<le> a \<and> a \<le> (limit s) 
-                                \<and> (\<forall>p'\<in> p. p'\<notin> (forbid s))
-                                \<and> (\<forall>p'\<in> (require s). p' \<in> p) }"
+                                \<and> prop_pred (require s) (forbid s) p }"
+
+lemma "\<forall>P. \<exists>I. prop_pred A B P \<longleftrightarrow> prop_pred A B (P-I)"
+  by(auto simp:prop_pred_def)
+  
+
+definition  wf_mkblock :: "block_spec \<Rightarrow> bool" 
+  where  "wf_mkblock s = (\<exists>n. \<forall>ap \<in> mk_block s. (snd ap) < n)"
+
+
+  
 
 
 text {* A single block mapping that maps the specified source block to the given 
@@ -121,6 +163,7 @@ definition mk_map :: "map_spec \<Rightarrow> addr \<Rightarrow> name set"
       else {})"
 
 
+
 text {* A finitely-specified decoding node, with a list of blocks to accept 
         locally, and a list of those to translate: *}
 
@@ -132,6 +175,7 @@ record node_spec =
 
 definition empty_spec :: "node_spec"
   where "empty_spec = \<lparr> acc_blocks = [], map_blocks = [], overlay = None \<rparr>"
+
 
 (*<*)
 lemma acc_blocks_empty:
@@ -157,6 +201,8 @@ primrec add_blocks :: "block_spec list \<Rightarrow> node \<Rightarrow> node"
   where "add_blocks [] node = node" |
         "add_blocks (s#ss) node = accept_update (op \<union> (mk_block s)) 
                                                 (add_blocks ss node)"
+
+
 
 (*<*)
 lemma translate_add_blocks:
@@ -362,6 +408,8 @@ primrec mk_net :: "net_spec \<Rightarrow> net"
   where "mk_net [] = empty_net" |
         "mk_net (s#ss) = (mk_net ss)(fst s := mk_node (snd s))"
 
+
+
 (*<*)
 lemma map_blocks_empty_spec:
   "map_blocks empty_spec = []"
@@ -369,12 +417,15 @@ lemma map_blocks_empty_spec:
 
 subsubsection {* Correctness by Construction *}
 
+
 definition wf_node :: "node \<Rightarrow> bool"
   where "wf_node node \<longleftrightarrow> finite (accept node) \<and> (\<forall>a. finite (translate node a))"
 
 lemma wf_nodeI:
   "finite (accept node) \<Longrightarrow> (\<And>a. finite (translate node a)) \<Longrightarrow> wf_node node"
   by(simp add:wf_node_def)
+
+
 
 lemma wf_node_wf_net:
   "(\<And>nd. wf_node (net nd)) \<Longrightarrow> wf_net net"
@@ -392,11 +443,13 @@ lemma wf_overlay:
 
 lemma finite_mk_block:
 "finite (mk_block s)"
+  oops
 proof -
   have sep: "\<And>s. mk_block s = ({a . base s \<le> a 
                       \<and> a \<le> limit s}) \<times> {p | p . (\<forall>p'\<in> p. p'\<notin> (forbid s))
                                 \<and> (\<forall>p'\<in> (require s). p' \<in> p)}"
     by(auto simp:mk_block_def)
+
 
   have finProps : "finite  {p | p . (\<forall>p'\<in> p. p'\<notin> (forbid s))
                                 \<and> (\<forall>p'\<in> (require s). p' \<in> p)}"
@@ -406,6 +459,7 @@ proof -
   from sep finProps finAddrs show ?thesis
     by(auto)
 qed
+
 
 lemma wf_add_blocks:
   assumes wf_base: "wf_node node"
@@ -445,12 +499,17 @@ lemma wf_empty_net:
   unfolding empty_net_def by(auto intro:wf_node_wf_net wf_empty_node)
 (*>*)
 
+
+
 text {* Nets built from abstract syntax are correct by construction: *}
 lemma wf_mk_net:
   "wf_net (mk_net ss)"
 (*<*)
   by(rule wf_node_wf_net, induct ss, simp_all add:empty_net_def wf_empty_node wf_mk_node)
 (*>*)
+
+
+
 subsubsection {* Finding Fresh Nodes *}
 
 text {* These functions are guaranteed to return a node that's unused in the supplied

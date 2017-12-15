@@ -44,9 +44,12 @@ text "First, we nail down some types.  For ease in getting started, we're using 
 
 type_synonym nodeid = nat
 type_synonym genaddr = nat
-type_synonym property = nat
+type_synonym property = int
+
 
 type_synonym addr = "genaddr \<times> property set"
+
+
 
 
 text "A name is a qualified address: which is defined with respect to some context, in this
@@ -65,6 +68,8 @@ text "A node can accept an input address, in which case resolution terminates he
 record node =
   accept    :: "addr set"
   translate :: "addr \<Rightarrow> name set"
+
+
 
   (*<*)
 text {* An empty node accepts nothing, and translates nothing. *}
