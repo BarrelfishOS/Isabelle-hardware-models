@@ -110,7 +110,7 @@ subsection "Virtual Page Number"
 (* ------------------------------------------------------------------------- *)  
   
 text "The Virtual Page Number (VPN) identifies a page of a given size in a 
-      40-bit virtual address space (1 TB)"
+      40-bit virtual genaddress space (1 TB)"
 
 definition VASize :: nat 
   where "VASize = 1099511627776"   (* 1TB *)    
@@ -174,7 +174,7 @@ subsection "Physical Frame Number"
 (* ------------------------------------------------------------------------- *)  
 
 text "The Physical Frame Number (PFN) is an index into the array of physical frames.
-      There is a physical address space of 36 bits or 64 GB. The maximum number of 
+      There is a physical genaddress space of 36 bits or 64 GB. The maximum number of 
       frames depends on the actual frame size i.e. the MASK. "
   
 definition PASize :: nat 
@@ -206,7 +206,7 @@ definition PFNValidSet :: "MASK \<Rightarrow> nat set"
     
 
 text "The following lemmas proof that the maximum PFN multiplied by the
-      actual page number is always the physical address space size."
+      actual page number is always the physical genaddress space size."
   
 lemma  "((PFNMax m) + 1) * (page_size m) = PASize"
   by(cases m, simp_all add:PFNMax_def PASize_def GB_def MB_def KB_def)
@@ -223,7 +223,7 @@ subsection "Address Space Identifier"
 (* ------------------------------------------------------------------------- *)    
   
 text "The Address Space Identifier (ASID) is an 8-bit number identifying the 
-      current address space that is active and hence the 'view' of the system"
+      current genaddress space that is active and hence the 'view' of the system"
 
 type_synonym ASID = nat
   
@@ -287,7 +287,7 @@ subsection "Compound Types"
 (* ------------------------------------------------------------------------- *)
   
 text "Based on the those base types we can define more complex types like virtual
-     address and physical address as follows"
+     genaddress and physical genaddress as follows"
     
 type_synonym VA = "ASID \<times> VPN \<times> OFFSET"
 type_synonym PA = "PFN \<times> OFFSET"
@@ -526,22 +526,22 @@ subsection "Obtaining the minimum and maximum VA"
 text {* The entry pair maps the range [EntryMinVA, EntryMaxVA). Divided into two
         ranges [EntryMinVA0, EntryMaxVA0] and [EntryMinVA1, EntryMaxVA1]  *}
 
-definition EntryMinVA :: "TLBENTRY \<Rightarrow> addr" where
+definition EntryMinVA :: "TLBENTRY \<Rightarrow> genaddr" where
   "EntryMinVA e = (vpn2 (hi e)) * page_size (mask e)"
   
-definition EntryMaxVA :: "TLBENTRY \<Rightarrow> addr" where
+definition EntryMaxVA :: "TLBENTRY \<Rightarrow> genaddr" where
   "EntryMaxVA e = (EntryMinVA e) + (EntrySize e) + (EntrySize e) - 1"
   
-definition EntryMinVA0 :: "TLBENTRY \<Rightarrow> addr" where
+definition EntryMinVA0 :: "TLBENTRY \<Rightarrow> genaddr" where
   "EntryMinVA0 e = (EntryMinVA e)"
   
-definition EntryMaxVA0 :: "TLBENTRY \<Rightarrow> addr" where
+definition EntryMaxVA0 :: "TLBENTRY \<Rightarrow> genaddr" where
   "EntryMaxVA0 e = ((EntryMinVA0 e) + (EntrySize e) - 1)"
   
-definition EntryMinVA1 :: "TLBENTRY \<Rightarrow> addr" where
+definition EntryMinVA1 :: "TLBENTRY \<Rightarrow> genaddr" where
   "EntryMinVA1 e = ((EntryMinVA e) + (EntrySize e))"   
   
-definition EntryMaxVA1 :: "TLBENTRY \<Rightarrow> addr" where
+definition EntryMaxVA1 :: "TLBENTRY \<Rightarrow> genaddr" where
   "EntryMaxVA1 e = EntryMaxVA e"
  
   
@@ -572,25 +572,25 @@ lemma MaxVANullEntry : "EntryMaxVA null_entry = 8191"
 subsection "TLB Entry ASID ranges"
 (* ------------------------------------------------------------------------- *)      
     
-definition EntryASIDRange :: "TLBENTRY \<Rightarrow> addr set"
+definition EntryASIDRange :: "TLBENTRY \<Rightarrow> genaddr set"
   where "EntryASIDRange e = (if EntryIsGlobal e 
                              then {x. ASIDMin \<le> x \<and> x < ASIDMax} 
                              else {(asid (hi e))})"
     
 (* ------------------------------------------------------------------------- *)      
-subsection "TLB Entry address ranges"
+subsection "TLB Entry genaddress ranges"
 (* ------------------------------------------------------------------------- *)          
 
-text "From the minimum and maximum addresses we can now define the range of
-      addresses and entry spans i.e. the set of addresses"
+text "From the minimum and maximum genaddresses we can now define the range of
+      genaddresses and entry spans i.e. the set of genaddresses"
   
-definition EntryRange :: "TLBENTRY \<Rightarrow> addr set"
+definition EntryRange :: "TLBENTRY \<Rightarrow> genaddr set"
   where "EntryRange e =  {x.  (EntryMinVA e) \<le> x \<and> x \<le> (EntryMaxVA e)}"
   
-definition EntryRange0 :: "TLBENTRY \<Rightarrow> addr set" 
+definition EntryRange0 :: "TLBENTRY \<Rightarrow> genaddr set" 
   where "EntryRange0 e =  {x.  (EntryMinVA0 e) \<le> x \<and> x \<le> (EntryMaxVA0 e)}"  
 
-definition EntryRange1 :: "TLBENTRY \<Rightarrow> addr set" 
+definition EntryRange1 :: "TLBENTRY \<Rightarrow> genaddr set" 
   where "EntryRange1 e =  {x.  (EntryMinVA1 e) \<le> x \<and> x \<le> (EntryMaxVA1 e)}"
     
 text "the range covered by the full entry must be the union of the two entries"
@@ -603,7 +603,7 @@ lemma entry_range_union:  "EntryRange e = (EntryRange0 e) \<union> (EntryRange1 
 lemma EntryRangeNullEntry : "EntryRange null_entry = {x.  0 \<le> x \<and> x \<le> 8191}"
   by(auto simp: EntryRange_def MinVANullEntry MaxVANullEntry)
 
-text "A wellformed entry has a range with falls within the virtual address space."
+text "A wellformed entry has a range with falls within the virtual genaddress space."
     
 lemma TLBENTRYWellFormedEntryRangeValid :
   "TLBENTRYWellFormed e1 \<Longrightarrow>  \<forall> x \<in> EntryRange e1. x < VASize"
@@ -620,9 +620,9 @@ subsection "Extended Address Ranges"
 (* ------------------------------------------------------------------------- *)      
 
   
-text "The extended address is the address extended with the address space identifier.
-      we define the function to take a set of addresses and ASIDs and then expand any
-      address with all the ASIDs. "
+text "The extended genaddress is the genaddress extended with the genaddress space identifier.
+      we define the function to take a set of genaddresses and ASIDs and then expand any
+      genaddress with all the ASIDs. "
   
 definition mk_extended_range :: "nat set \<Rightarrow> nat set \<Rightarrow> nat set"
   where "mk_extended_range A R = 
@@ -663,7 +663,7 @@ subsubsection "Extended Range Unions"
 (* ------------------------------------------------------------------------- *) 
   
   
-lemma mk_extended_range_addr_union: 
+lemma mk_extended_range_genaddr_union: 
   "mk_extended_range X (A \<union> B) = (mk_extended_range X A) \<union> (mk_extended_range X B)"
   by(auto simp:mk_extended_range_def)
 
@@ -683,7 +683,7 @@ subsubsection "Extended Range Intersections"
 (* ------------------------------------------------------------------------- *) 
   
   
-lemma mk_extended_range_addr_inter: 
+lemma mk_extended_range_genaddr_inter: 
  assumes spaceA:  "\<forall>a\<in>A . a < VASize" 
     and  spaceB:  "\<forall>b\<in>B . b < VASize" 
   shows "mk_extended_range X (A \<inter> B) = 
@@ -885,7 +885,7 @@ next
 qed   
   
     
-lemma mk_extended_range_empty_addr_inter :
+lemma mk_extended_range_empty_genaddr_inter :
   assumes nempty : "X \<noteq> {}"
   shows  "(A \<inter> B = {}) = (mk_extended_range X (A \<inter> B) = {})"
 proof 
@@ -920,7 +920,7 @@ next
 qed    
   
 
-lemma mk_extended_range_empty_addr_inter2 :
+lemma mk_extended_range_empty_genaddr_inter2 :
   assumes spaceA:  "\<forall>a\<in>A . a < VASize" 
       and spaceB:  "\<forall>b\<in>B . b < VASize"
       and nz: "VASize \<noteq> 0"
@@ -935,19 +935,19 @@ subsection "TLB Entry Extended Address Ranges"
 (* ------------------------------------------------------------------------- *) 
   
     
-definition EntryExtendedRange :: "TLBENTRY \<Rightarrow> addr set"
+definition EntryExtendedRange :: "TLBENTRY \<Rightarrow> genaddr set"
   where "EntryExtendedRange e =  (if (EntryIsGlobal e) then
                                     (mk_extended_range ASIDValidSet (EntryRange e))
                                   else  
                                     (mk_extended_range {asid (hi e)} (EntryRange e)))"
   
-definition EntryExtendedRange0 :: "TLBENTRY \<Rightarrow> addr set" 
+definition EntryExtendedRange0 :: "TLBENTRY \<Rightarrow> genaddr set" 
   where "EntryExtendedRange0 e =   (if (EntryIsGlobal e) then
                                      (mk_extended_range ASIDValidSet  (EntryRange0 e))
                                    else
                                      (mk_extended_range {asid (hi e)} (EntryRange0 e)))"  
 
-definition EntryExtendedRange1 :: "TLBENTRY \<Rightarrow> addr set" 
+definition EntryExtendedRange1 :: "TLBENTRY \<Rightarrow> genaddr set" 
   where "EntryExtendedRange1 e =   (if (EntryIsGlobal e) then
                                       (mk_extended_range ASIDValidSet (EntryRange1 e))
                                    else
@@ -960,7 +960,7 @@ subsection "Extended Range Union"
 lemma entry_extended_range_union:  
   "EntryExtendedRange e = (EntryExtendedRange0 e) \<union> (EntryExtendedRange1 e)"   
   by(simp add:EntryExtendedRange_def EntryExtendedRange0_def EntryExtendedRange1_def 
-              mk_extended_range_addr_union[symmetric] entry_range_union)
+              mk_extended_range_genaddr_union[symmetric] entry_range_union)
 
             
 (* ------------------------------------------------------------------------- *) 
@@ -982,7 +982,7 @@ proof -
     by(simp add :TLBENTRYWellFormedEntryRangeValid)
   with space1 have X0:  "mk_extended_range X (EntryRange e1) \<inter> mk_extended_range X (EntryRange e2) = 
                         mk_extended_range X ((EntryRange e1) \<inter> (EntryRange e2))"
-    by(simp add:mk_extended_range_addr_inter[symmetric] space1 space2 nz)
+    by(simp add:mk_extended_range_genaddr_inter[symmetric] space1 space2 nz)
   
   hence X1: "mk_extended_range X (EntryRange e1 \<inter> EntryRange e2)  = mk_extended_range X {}"
      by(simp add:empty)
@@ -1020,7 +1020,7 @@ proof cases
                    \<inter> mk_extended_range {asid (hi e2)} (EntryRange e2)"
         by(simp add:EntryExtendedRange_def)
       with space1 space2 empty nz show ?thesis 
-         by(auto simp add:mk_extended_range_empty_addr_inter2)      
+         by(auto simp add:mk_extended_range_empty_genaddr_inter2)      
      qed
   qed              
 next
@@ -1040,7 +1040,7 @@ next
                   \<inter> mk_extended_range ASIDValidSet  (EntryRange e2)"
         by(simp add:EntryExtendedRange_def)
       with space1 space2 empty nz show ?thesis 
-         by(auto simp add:mk_extended_range_empty_addr_inter2)      
+         by(auto simp add:mk_extended_range_empty_genaddr_inter2)      
      qed
   next
     assume ne2g: "\<not>(EntryIsGlobal e2)"
@@ -1056,7 +1056,7 @@ next
                    \<inter> mk_extended_range {asid (hi e2)}  (EntryRange e2)"
         by(simp add:EntryExtendedRange_def)
       with space1 space2 empty nz show ?thesis 
-         by(auto simp add:mk_extended_range_empty_addr_inter2)      
+         by(auto simp add:mk_extended_range_empty_genaddr_inter2)      
      qed
   qed              
 qed      
@@ -1067,12 +1067,12 @@ subsection "TLB Entry Physical Addresses"
 (* ------------------------------------------------------------------------- *)  
     
 text "The TLB entry pair maps to two physical regions, we need to multiply the PFN
-      with the actual frame size to get the address"  
+      with the actual frame size to get the genaddress"  
   
-definition EntryPA0 :: "TLBENTRY \<Rightarrow> addr" 
+definition EntryPA0 :: "TLBENTRY \<Rightarrow> genaddr" 
   where "EntryPA0 e = (pfn (lo0 e)) * (EntrySize e)"
  
-definition EntryPA1 :: "TLBENTRY \<Rightarrow> addr" 
+definition EntryPA1 :: "TLBENTRY \<Rightarrow> genaddr" 
   where "EntryPA1 e = (pfn (lo1 e)) * (EntrySize e)"
 
     
@@ -1138,7 +1138,7 @@ lemma TLBEntryResetASID_match :
 subsection "VPN Match"  
 (* ------------------------------------------------------------------------- *)   
 
-text "The VPN matches if their respective virtual addresses fall within the
+text "The VPN matches if their respective virtual genaddresses fall within the
       ranges. "   
   
 definition EntryMax4KVPN :: "TLBENTRY \<Rightarrow> VPN"
@@ -1382,8 +1382,8 @@ proof cases
             \<inter> mk_extended_range ASIDValidSet (EntryRange e2) \<noteq> {})"
         by(simp add:EntryMatchER_def EntryExtendedRange_def e1g e2g)
       hence  X2: "... = (mk_extended_range ASIDValidSet (EntryRange e1 \<inter> EntryRange e2) \<noteq> {})"
-        by(simp add:mk_extended_range_addr_inter nz space1 space2)
-      with X0 X1 show ?thesis by(simp add:X0 X1 X2 nemtpy mk_extended_range_empty_addr_inter)
+        by(simp add:mk_extended_range_genaddr_inter nz space1 space2)
+      with X0 X1 show ?thesis by(simp add:X0 X1 X2 nemtpy mk_extended_range_empty_genaddr_inter)
     qed
   next
     assume ne2g: "\<not>(EntryIsGlobal e2)"
@@ -1404,7 +1404,7 @@ proof cases
         by(simp add:mk_extended_range_inter space1 space2 nz) 
       from asidset have X3: "... = (mk_extended_range {asid (hi e2)} (EntryRange e1 \<inter> EntryRange e2) \<noteq> {})"
         by(auto)
-      with X0 X1 show ?thesis by(simp add:X0 X1 X2 X3 mk_extended_range_empty_addr_inter)
+      with X0 X1 show ?thesis by(simp add:X0 X1 X2 X3 mk_extended_range_empty_genaddr_inter)
     qed
   qed              
 next
@@ -1429,7 +1429,7 @@ next
         by(simp add:mk_extended_range_inter space1 space2 nz) 
       from asidset have X3: "... = (mk_extended_range {asid (hi e1)} (EntryRange e1 \<inter> EntryRange e2) \<noteq> {})"
         by(auto)
-      with X0 X1 show ?thesis by(simp add:X0 X1 X2 X3 mk_extended_range_empty_addr_inter)
+      with X0 X1 show ?thesis by(simp add:X0 X1 X2 X3 mk_extended_range_empty_genaddr_inter)
     qed      
   next
     assume ne2g: "\<not>(EntryIsGlobal e2)"
@@ -1457,7 +1457,7 @@ next
             have X0: "EntryMatch e1 e2 = (EntryRange e1 \<inter> EntryRange e2 \<noteq> {})"
               by(simp add:EntryMatch_def asidmatch EntryVPNMatch_def)
             with X1 X2 X3 X0 show ?thesis 
-              by(simp add:X1 X2 X3 X0 mk_extended_range_empty_addr_inter)
+              by(simp add:X1 X2 X3 X0 mk_extended_range_empty_genaddr_inter)
           qed
         next
         assume eq:  "(asid (hi e1)) \<noteq>  (asid (hi e2))"
@@ -1470,7 +1470,7 @@ next
             have X0: "EntryMatch e1 e2 =  False"
               by(simp add:EntryMatch_def nasidmatch)
             with X1 X2 X3 X0 show ?thesis 
-              by(auto simp:mk_extended_range_def X1 X2 X3 X0 mk_extended_range_empty_addr_inter)
+              by(auto simp:mk_extended_range_def X1 X2 X3 X0 mk_extended_range_empty_genaddr_inter)
           qed
         qed
     qed  
@@ -1751,7 +1751,7 @@ subsection "TLB Valid"
   
 text "The TLB is in a valid state if all entries are valid with respect to
       their values and for any two entries, they are either the same
-      or they won't match to the same address range. For any state 
+      or they won't match to the same genaddress range. For any state 
       modification of the TLB, this must hold. "
   
 definition TLBValid_orig :: "MIPSTLB \<Rightarrow> bool"
@@ -2518,14 +2518,15 @@ subsection "Helper Functions"
   
 text{* Creates a mapspec list from the odd and even entries *}
 
+(* TODO:  PROPERTIES ! *)
     
-definition EntryToMap :: "nodeid \<Rightarrow> TLBENTRY \<Rightarrow> nat \<Rightarrow>(nat \<times> nat) set"
+definition EntryToMap :: "nodeid \<Rightarrow> TLBENTRY \<Rightarrow> addr \<Rightarrow> name set"
   where
     "EntryToMap nd e va =
-      (if EntryIsValid0 e \<and> va \<in> EntryExtendedRange0 e then 
-          {(nd, EntryPA0 e + ((va mod VASize) - EntryMinVA0 e))} else {}) \<union>
-      (if EntryIsValid1 e \<and> va \<in> EntryExtendedRange1 e then
-           {(nd, EntryPA1 e + ((va mod VASize) - EntryMinVA1 e))} else {})"      
+      (if EntryIsValid0 e \<and> (fst va) \<in> EntryExtendedRange0 e then 
+          {(nd, (EntryPA0 e + (((fst va) mod VASize) - EntryMinVA0 e)), {})} else {}) \<union>
+      (if EntryIsValid1 e \<and> (fst va) \<in> EntryExtendedRange1 e then
+           {(nd, (EntryPA1 e + (((fst va) mod VASize) - EntryMinVA1 e)), {})} else {})"      
     
 
 (* ------------------------------------------------------------------------- *)  
@@ -2685,9 +2686,9 @@ qed
 section "TLB Exceptions"
 (* ========================================================================= *)   
 
-text "An attempt to translate a mapped address can result into one of four
+text "An attempt to translate a mapped genaddress can result into one of four
       states: no entry present (REFILL), entry is invalid (INVALID) those
-      won't translate the address. The address will be translated if
+      won't translate the genaddress. The genaddress will be translated if
       the entry is in the modified state or there is no exception."  
   
 datatype MIPSTLBEXN = EXNREFILL | EXNINVALID | EXNMOD | EXNOK
