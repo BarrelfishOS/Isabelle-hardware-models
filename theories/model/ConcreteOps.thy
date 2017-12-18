@@ -57,32 +57,32 @@ definition acceptor_node_C :: "node_spec \<Rightarrow> node_spec"
 
 (*<*)
 lemma translate_nomap:
-  "a \<notin> accept (add_blocks bs empty_node) \<Longrightarrow>
-   translate (add_maps (remap_all nd' bs) node) a = translate node a"
+  "a \<notin> accept (add_blocks ps bs empty_node) \<Longrightarrow>
+   translate (add_maps ps (remap_all nd' bs) node) a = translate node a"
   by(simp add:add_maps_recursive[symmetric], induct bs, simp_all add:mk_map_def direct_map_def)
 
 lemma translate_map:
-  "a \<in> accept (add_blocks bs empty_node) \<Longrightarrow>
-   translate (add_maps (remap_all nd' bs) node) a = insert (nd', a) (translate node a)"
+  "a \<in> accept (add_blocks ps bs empty_node) \<Longrightarrow>
+   translate (add_maps ps (remap_all nd' bs) node) a = insert (nd', a) (translate node a)"
 proof(induct bs, simp add:accept_empty_node)
   fix b bs
-  assume IH: "a \<in> accept (add_blocks bs empty_node) \<Longrightarrow>
-              translate (add_maps (remap_all nd' bs) node) a = insert (nd', a) (translate node a)"
+  assume IH: "a \<in> accept (add_blocks ps bs empty_node) \<Longrightarrow>
+              translate (add_maps ps (remap_all nd' bs) node) a = insert (nd', a) (translate node a)"
     
-  assume "a \<in> accept (add_blocks (b # bs) empty_node)"
-  hence either: "a \<in> mk_block b \<or> a \<in> accept (add_blocks bs empty_node)" by(simp)
+  assume "a \<in> accept (add_blocks ps (b # bs) empty_node)"
+  hence either: "a \<in> mk_block ps b \<or> a \<in> accept (add_blocks ps bs empty_node)" by(simp)
       
-  show "translate (add_maps (remap_all nd' (b # bs)) node) a = insert (nd', a) (translate node a)"
+  show "translate (add_maps ps (remap_all nd' (b # bs)) node) a = insert (nd', a) (translate node a)"
   proof(cases)
-    assume "a \<in> accept (add_blocks bs empty_node)"
+    assume "a \<in> accept (add_blocks ps bs empty_node)"
     thus ?thesis 
       apply(simp add:add_maps_recursive[symmetric])
       apply(simp add: IH mk_map_def direct_map_def mk_block_def add_maps_recursive)
       apply(auto)
       done
   next
-    assume notin: "a \<notin> accept (add_blocks bs empty_node)"
-    with either have "a \<in> mk_block b" by(blast)
+    assume notin: "a \<notin> accept (add_blocks ps bs empty_node)"
+    with either have "a \<in> mk_block ps b" by(blast)
     thus ?thesis 
       apply(simp add:add_maps_recursive[symmetric])
       apply(simp add:translate_nomap notin mk_map_def direct_map_def mk_block_def add_maps_recursive)
@@ -92,18 +92,18 @@ proof(induct bs, simp add:accept_empty_node)
 qed
            
 lemma translate_redirect:
-  "a \<in> accept (mk_node ns) \<Longrightarrow>
-   translate (mk_node (redirector_node_C nd' ns)) a = {(nd',a)} \<union> translate (mk_node ns) a"
+  "a \<in> accept (mk_node ps ns) \<Longrightarrow>
+   translate (mk_node ps (redirector_node_C nd' ns)) a = {(nd',a)} \<union> translate (mk_node ps ns) a"
   by(simp add:translate_mk_node redirector_node_C_def add_maps_append accept_mk_node translate_map)
 
 lemma translate_noredirect:
-  "a \<notin> accept (mk_node ns) \<Longrightarrow> translate (mk_node (redirector_node_C nd' ns)) a =
-                               translate (mk_node ns) a"
+  "a \<notin> accept (mk_node ps ns) \<Longrightarrow> translate (mk_node ps (redirector_node_C nd' ns)) a =
+                               translate (mk_node ps ns) a"
   by(simp add:translate_mk_node redirector_node_C_def accept_mk_node add_maps_append translate_nomap)
 (*>*)
 text {* The concrete redirector node refines the abstract: *}
 lemma redirector_rel:
-  "mk_node (redirector_node_C nd' ns) = redirector_node nd' (mk_node ns)"
+  "mk_node ps (redirector_node_C nd' ns) = redirector_node nd' (mk_node ps ns)"
 (*<*)
   (is "?X = ?Y")
 proof -
@@ -114,7 +114,7 @@ proof -
   proof(rule ext)
     fix a
     show "translate ?X a = translate ?Y a"
-      by(cases "a \<in> accept (mk_node ns)",
+      by(cases "a \<in> accept (mk_node ps ns)",
          simp_all add:redirector_node_def translate_redirect translate_noredirect)
   qed
   ultimately show ?thesis by(simp)
@@ -122,13 +122,13 @@ qed
 (*>*)
 text {* The concrete acceptor node refines the abstract: *}
 lemma acceptor_rel:
-  "mk_node (acceptor_node_C ns) = acceptor_node (mk_node ns)"
+  "mk_node ps (acceptor_node_C ns) = acceptor_node (mk_node ps ns)"
 (*<*)
 proof -
-  have "translate (mk_node (acceptor_node_C ns)) = translate (acceptor_node (mk_node ns))"
+  have "translate (mk_node ps (acceptor_node_C ns)) = translate (acceptor_node (mk_node ps ns))"
     by(simp add:acceptor_node_C_def acceptor_node_def translate_mk_node empty_spec_def
                 mk_overlay_def add_maps_recursive[symmetric])
-  moreover have "accept (mk_node (acceptor_node_C ns)) = accept (acceptor_node (mk_node ns))"
+  moreover have "accept (mk_node ps (acceptor_node_C ns)) = accept (acceptor_node (mk_node ps ns))"
     by(simp add:acceptor_node_C_def acceptor_node_def accept_mk_node)
   ultimately show ?thesis by(simp)
 qed
@@ -158,16 +158,16 @@ proof(induct ss, simp)
     
   have "mk_net (split_all_C off (s # ss)) =
         (mk_net (split_all_C off ss))
-          (fst s := redirector_node (off + fst s) (mk_node (snd s)),
-           off + fst s := acceptor_node (mk_node (snd s)))"
+          (fst s := redirector_node (off + fst s) (mk_node relevant_props (snd s)),
+           off + fst s := acceptor_node (mk_node relevant_props (snd s)))"
     by(simp add:redirector_rel acceptor_rel)
   also from distinct bound IH
   have "... =
         (?Y ss)
-          (fst s := redirector_node (off + fst s) (mk_node (snd s)),
-           off + fst s := acceptor_node (mk_node (snd s)))"
+          (fst s := redirector_node (off + fst s) (mk_node relevant_props (snd s)),
+           off + fst s := acceptor_node (mk_node relevant_props (snd s)))"
     by(simp)
-  also have "... = split_node (fst s) (off + fst s) ((?Y ss)(fst s := mk_node (snd s)))"
+  also have "... = split_node (fst s) (off + fst s) ((?Y ss)(fst s := mk_node relevant_props (snd s)))"
     by(simp add:split_node_def)
   also {
     let ?prev = "..."

@@ -116,21 +116,22 @@ lemma view_leI:
 
 lemma view_eq_domD:
   "view_eq nd x y \<Longrightarrow> resolve_dom (snd x, nd, a) = resolve_dom (snd y, nd, a)"
-  by(simp add:view_eq_def)
-
+  by(simp only:view_eq_def)
+  
 lemma view_le_domD:
   "view_le nd x y \<Longrightarrow> resolve_dom (snd x, nd, a) \<Longrightarrow> resolve_dom (snd y, nd, a)"
-  by(simp add:view_le_def)
+  by(simp only:view_le_def)
 
 lemma view_eq_viewD:
   "view_eq nd x y \<Longrightarrow> resolve_dom (snd x, nd, a) \<Longrightarrow>
    rename (fst x) ` view_from nd (snd x) a = rename (fst y) ` view_from nd (snd y) a"
-  by(simp add:view_eq_def)
+  by(simp only:view_eq_def)
 
 lemma view_le_viewD:
   "view_le nd x y \<Longrightarrow> resolve_dom (snd x, nd, a) \<Longrightarrow>
    rename (fst x) ` view_from nd (snd x) a = rename (fst y) ` view_from nd (snd y) a"
-  by(simp add:view_le_def)
+  by(simp only:view_le_def)
+
     (*>*)
 text {* Both view-equivalence and node-equivalence are proper equivalence relations. *}
 
@@ -194,7 +195,7 @@ lemma node_eq_resolve:
   fixes nd nd' :: nodeid and net :: net and a :: addr
   shows "node_eq net nd nd' \<Longrightarrow> resolve_dom (net,nd,a) \<Longrightarrow> resolve net (nd,a) = resolve net (nd',a)"
     (*<*)
-  by(simp add:node_eq_def view_from_def)
+  by(simp only:node_eq_def view_from_def)
     (*>*)
 
 lemma view_eq_resolve:
@@ -202,12 +203,12 @@ lemma view_eq_resolve:
   shows "view_eq nd x y \<Longrightarrow> resolve_dom (snd x,nd,a) \<Longrightarrow>
          rename (fst x) ` resolve (snd x) (nd,a) = rename (fst y) ` resolve (snd y) (nd,a)"
     (*<*)
-  by(simp add:view_eq_def view_from_def)
+  by(simp only:view_eq_def view_from_def)
 
 lemma view_le_resolve:
   shows "view_le nd x y \<Longrightarrow> resolve_dom (snd x,nd,a) \<Longrightarrow>
          rename (fst x) ` resolve (snd x) (nd,a) = rename (fst y) ` resolve (snd y) (nd,a)"
-  by(simp add:view_le_def view_from_def)
+  by(simp only:view_le_def view_from_def)
     (*>*)
 text {* View-equivalence is preserved by any further node renaming. *}
     (*<*)
