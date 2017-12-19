@@ -31,11 +31,11 @@ theory IntroductionPhi
 begin
 
 text {* mapped physical addresses of DRAM *}
-definition "dram_sys0 = (0x0000000000000000,0x0000001fffffffff)" 
+definition "dram_sys0 =  blockn 0x0000000000000000 0x0000001fffffffff" 
 
 text {* PCI Express Ranges *}
-definition "pci_mmio = (0xd000000000,0xd000efffff)"
-definition "pci_aperture = (0x380000000000,0x3802009fffff)"
+definition "pci_mmio = blockn 0xd000000000 0xd000efffff"
+definition "pci_aperture = blockn 0x380000000000 0x3802009fffff"
 
 text {* node 0: the node 0 interconnect *}              
 definition "node_0_interconnect = empty_spec \<lparr>
@@ -52,9 +52,9 @@ definition "node_1_pci = empty_spec \<lparr>
 \<rparr>"
   
 text {* node 2: Xeon Phi co-processor *}
-definition "phi_gddr = (0, 0x180000000)"
-definition "phi_sbox = (0x08007d0000,0x8007e0000)"
-definition "phi_sysmem = (0x8000000000, 0xffffffffff)"
+definition "phi_gddr = blockn 0  0x180000000"
+definition "phi_sbox = blockn 0x08007d0000 0x8007e0000"
+definition "phi_sysmem = blockn 0x8000000000 0xffffffffff"
 definition "node_2_phi = empty_spec \<lparr>
   acc_blocks := [phi_gddr,phi_sbox ],
   map_blocks := [block_map phi_sysmem 3 0x0]

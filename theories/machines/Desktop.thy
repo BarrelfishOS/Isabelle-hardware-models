@@ -35,9 +35,9 @@ begin
 subsubsection {* Address spaces *}
 
 text {* The Interconnect *}              
-definition "dram_sys0 = (0x0000000000100000, 0x00000000C00FFFFF)" 
-definition "dram_sys1 = (0x0000000100000000, 0x000000083FFFFFFF)"
-definition "pci_devs =  (0x00000000C0800000, 0x00000000C2FFFFFF)"
+definition "dram_sys0 = blockn 0x0000000000100000 0x00000000C00FFFFF" 
+definition "dram_sys1 = blockn 0x0000000100000000 0x000000083FFFFFFF"
+definition "pci_devs =  blockn 0x00000000C0800000 0x00000000C2FFFFFF"
 definition "node_0_interconnect = empty_spec \<lparr>
   acc_blocks := [],
   map_blocks := [block_map dram_sys0 1 0x0, block_map dram_sys1 1 0xC0000000,
@@ -45,22 +45,22 @@ definition "node_0_interconnect = empty_spec \<lparr>
 \<rparr>" 
   
 text {* The DRAM Controller: has 2 channels with 16G each. *}
-definition "dram0 = (0x000000000, 0x3FFFFFFFF)"
-definition "dram1 = (0x400000000, 0x7FFFFFFFF)"
+definition "dram0 = blockn 0x000000000 0x3FFFFFFFF"
+definition "dram1 = blockn 0x400000000 0x7FFFFFFFF"
 definition "node_1_dram = empty_spec \<lparr>
   acc_blocks := [dram0, dram1],
   map_blocks := []
 \<rparr>"
 
 text {* The PCI Root Complex *}
-definition "xhci  = (0xC1580000, 0xC158FFFF)"
-definition "e1000 = (0xC1300000, 0xC13FFFFF)"
-definition "ahci  = (0xC1520000, 0xC15207FF)"
-definition "vga2  = (0xC1010000, 0xC1013FFF)"
-definition "vga1  = (0xC2000000, 0xC2FFFFFF)"
+definition "xhci  = blockn 0xC1580000 0xC158FFFF"
+definition "e1000 = blockn 0xC1300000 0xC13FFFFF"
+definition "ahci  = blockn 0xC1520000 0xC15207FF"
+definition "vga2  = blockn 0xC1010000 0xC1013FFF"
+definition "vga1  = blockn 0xC2000000 0xC2FFFFFF"
   
-definition "vga4  = (0xC1000000, 0xC100FFFF)"
-definition "vga3  = (0xC0800000, 0xC0FFFFFF)"
+definition "vga4  = blockn 0xC1000000 0xC100FFFF"
+definition "vga3  = blockn 0xC0800000 0xC0FFFFFF"
   
 definition "node_2_pci = empty_spec \<lparr>
   acc_blocks := [],
@@ -96,7 +96,7 @@ definition "node_6_vga = empty_spec \<lparr>
 
 
 text {* CPU Cores*}
-definition "lapic = (0xFEE00000, 0xFEE0FFFF)"
+definition "lapic = blockn 0xFEE00000 0xFEE0FFFF"
 definition "cpu_phys = empty_spec \<lparr>
   acc_blocks := [lapic],
   overlay := Some 0

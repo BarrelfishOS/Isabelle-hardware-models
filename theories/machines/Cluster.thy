@@ -34,8 +34,8 @@ begin
 
 subsubsection {* Model representation *}
 
-definition "dram = (0x0000000000000000,0x000000203FFFFFFF)" 
-definition "pci = (0x0000380000000000,0x00003802009FFFFF)"
+definition "dram = blockn 0x0000000000000000 0x000000203FFFFFFF" 
+definition "pci  = blockn 0x0000380000000000 0x00003802009FFFFF"
 
 text {* The Interconnect: *}
   
@@ -63,8 +63,8 @@ definition "node_3_m1_pci = empty_spec \<lparr>
   
 text {* Infiniband Cards (RDMA): *}
   
-definition "remote_ram = (0x0000000000000000,0x000000203FFFFFF)"
-definition "host_ram = (0x000800000000000,0x0008000203FFFFFF)"
+definition "remote_ram = blockn 0x0000000000000000 0x0000000203FFFFFF"
+definition "host_ram   = blockn 0x0000800000000000 0x0008000203FFFFFF"
 definition "node_4_m1_cx3 = empty_spec \<lparr>
   acc_blocks := [pci],
   map_blocks := [block_map host_ram 6 0x0, block_map remote_ram 5 0x000800000000000]

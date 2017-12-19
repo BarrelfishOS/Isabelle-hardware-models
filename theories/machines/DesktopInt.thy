@@ -41,14 +41,14 @@ text {* Convention: Interrupt issuing devices start at their
 text {* Convention: MSI uses memory 32bit memory writes. We encode such a memory write by
         concatenating the 64bit address with the 32bit data word. *} 
 
-definition "gfx_msi_write = 0x00000000FEE002b800000029"
+definition "gfx_msi_write =  0x00000000FEE002b800000029"
 definition "nic_msi_write0 = 0x00000000FEE002b80000007D"
 definition "nic_msi_write1 = 0x00000000FEE002b80000007E"
 definition "nic_msi_write2 = 0x00000000FEE002b80000007F"
 definition "nic_msi_write3 = 0x00000000FEE002b800000080"
 definition "nic_msi_write4 = 0x00000000FEE002b800000081"
   
-definition "x86_vec_domain = (32,255)"
+definition "x86_vec_domain = blockn 32 255"
   
 text {* LAPIC 0 *}
 definition "node_0_lapic_0 = empty_spec \<lparr>
@@ -77,37 +77,37 @@ definition "node_3_lapic_3 = empty_spec \<lparr>
 text {* IOAPIC 0 to LAPIC *}              
 definition "node_4_ioapic = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 4 0 48, one_map 8 0 40]
+  map_blocks := [one_map (4, {}) 0 48, one_map (8, {}) 0 40]
 \<rparr>" 
   
 text {* LNKA to IOAPIC *}              
 definition "node_5_lnka = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 4 4]
+  map_blocks := [one_map (0, {}) 4 4]
 \<rparr>" 
   
 text {* USB EHCI to LNKA *}              
 definition "node_6_usb = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 5 0]
+  map_blocks := [one_map (0, {}) 5 0]
 \<rparr>" 
   
 text {* RTC to IOAPIC *}              
 definition "node_7_rtc = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 4 8]
+  map_blocks := [one_map (0, {}) 4 8]
 \<rparr>" 
   
 text {* PCH to LAPICs. *}              
 definition "node_8_pch = empty_spec \<lparr>
   acc_blocks := [],
   map_blocks := [
-    one_map nic_msi_write0 0 125, 
-    one_map nic_msi_write1 0 126, 
-    one_map nic_msi_write2 0 127, 
-    one_map nic_msi_write3 0 128, 
-    one_map nic_msi_write4 0 129, 
-    one_map gfx_msi_write 0 41   
+    one_map (nic_msi_write0, {}) 0 125, 
+    one_map (nic_msi_write1, {}) 0 126, 
+    one_map (nic_msi_write2, {}) 0 127, 
+    one_map (nic_msi_write3, {}) 0 128, 
+    one_map (nic_msi_write4, {}) 0 129, 
+    one_map (gfx_msi_write, {}) 0 41   
 ]
 \<rparr>"
   
@@ -115,11 +115,11 @@ text {* NIC to PCH. Uses 5 interrupts. *}
 definition "node_9_nic = empty_spec \<lparr>
   acc_blocks := [],
   map_blocks := [
-    one_map 0 8 nic_msi_write0,
-    one_map 1 8 nic_msi_write1,
-    one_map 2 8 nic_msi_write2,
-    one_map 3 8 nic_msi_write3,
-    one_map 4 8 nic_msi_write4
+    one_map (0, {}) 8 nic_msi_write0,
+    one_map (1, {}) 8 nic_msi_write1,
+    one_map (2, {}) 8 nic_msi_write2,
+    one_map (3, {}) 8 nic_msi_write3,
+    one_map (4, {}) 8 nic_msi_write4
 ]
 \<rparr>"
   
@@ -127,32 +127,32 @@ text {* GFX to PCH. Uses 1 interrupt. *}
 definition "node_18_gfx = empty_spec \<lparr>
   acc_blocks := [],
   map_blocks := [
-    one_map 0 8 gfx_msi_write
+    one_map (0, {}) 8 gfx_msi_write
 ]
 \<rparr>"
   
 text {* Timer0 to LAPIC0 *}   
 definition "node_10_timer0 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 0 32]
+  map_blocks := [one_map (0, {}) 0 32]
 \<rparr>"
   
 text {* Timer1 to LAPIC1 *}   
 definition "node_11_timer1 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 1 32]
+  map_blocks := [one_map (0, {}) 1 32]
 \<rparr>"
   
 text {* Timer2 to LAPIC2 *}   
 definition "node_12_timer2 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 2 32]
+  map_blocks := [one_map (0, {}) 2 32]
 \<rparr>"
   
 text {* Timer3 to LAPIC3 *}   
 definition "node_13_timer3 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 3 32]
+  map_blocks := [one_map (0, {}) 3 32]
 \<rparr>"
   
 text {* TODO:  needs the set destination to make sense. We use the TLB shootdown IPI
@@ -161,7 +161,7 @@ text {* Core 0 to Other APICs. *}
 definition "node_14_core0 = empty_spec \<lparr>
   acc_blocks := [],
   map_blocks := [
-    one_map 0 3 251 (* [(1,251),(2,251),(3,251)] *)
+    one_map (0, {}) 3 251 (* [(1,251),(2,251),(3,251)] *)
     ] 
 \<rparr>"
   
@@ -169,8 +169,8 @@ text {* Core 1 to Other APICs. *}
 definition "node_15_core1 = empty_spec \<lparr>
   acc_blocks := [],
   map_blocks := [
-    one_map 0 3 251, (* [(0,251),(2,251),(3,251)] *)
-    one_map 1 0 48
+    one_map (0, {}) 3 251, (* [(0,251),(2,251),(3,251)] *)
+    one_map (1, {}) 0 48
     ]
 \<rparr>"
   
@@ -178,7 +178,7 @@ text {* Core 2 to Other APICs. *}
 definition "node_16_core2 = empty_spec \<lparr>
   acc_blocks := [],
   map_blocks := [
-    one_map 0 3 251 (* [(0,251),(1,251),(3,251)] *)
+    one_map (0, {}) 3 251 (* [(0,251),(1,251),(3,251)] *)
     ]
 \<rparr>"
   
@@ -186,7 +186,7 @@ text {* Core 3 to Other APICs. *}
 definition "node_17_core3 = empty_spec \<lparr>
   acc_blocks := [],
   map_blocks := [
-    one_map 0 3 251 (* [(0,251),(1,251),(3,251)] *)
+    one_map (0, {}) 3 251 (* [(0,251),(1,251),(3,251)] *)
     ]
 \<rparr>"
 

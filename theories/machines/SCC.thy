@@ -35,37 +35,37 @@ subsubsection {* Model representation *}
 text_raw {* \label{isabelle:scc} *}
 
 text {* Memory Controllers: 16GB each *} 
-definition "dram = (0x000000000,0x3FFFFFFFF)" 
+definition "dram = blockn 0x000000000 0x3FFFFFFFF" 
 definition "node_mc = empty_spec \<lparr>
   acc_blocks := [dram],
   map_blocks := []
 \<rparr>"
 
 text {* Local Memory / Message Passing buffer of 16kB *}
-definition "lmb = (0x000, 0xFFFF)"
+definition "lmb = blockn 0x000  0xFFFF"
 definition "node_lmb = empty_spec \<lparr>
   acc_blocks := [lmb],
   map_blocks := []
 \<rparr>"
 
 text {* Local Configuration Registers *}
-definition "conf = (0x000000, 0x7FFFFF)"
+definition "conf = blockn 0x000000 0x7FFFFF"
 definition "node_conf = empty_spec \<lparr>
   acc_blocks := [conf],
   map_blocks := []
 \<rparr>"
 
 text {* 2D Mesh Network *}
-definition "dram0 = (0x001800000000,0x001BFFFFFFFF)"
-definition "dram1 = (0x00F000000000,0x0013FFFFFFFF)"
-definition "dram2 = (0x041800000000,0x031BFFFFFFFF)"
-definition "dram3 = (0x04F000000000,0x03F3FFFFFFFF)"
+definition "dram0 = blockn 0x001800000000 0x001BFFFFFFFF"
+definition "dram1 = blockn 0x00F000000000 0x0013FFFFFFFF"
+definition "dram2 = blockn 0x041800000000 0x031BFFFFFFFF"
+definition "dram3 = blockn 0x04F000000000 0x03F3FFFFFFFF"
 
-definition "conf_00 = (0x000800000000, 0x0008007FFFFF)"
-definition "conf_01 = (0x002800000000, 0x0028007FFFFF)"
-definition "mpb_00  = (0x000C00000000, 0x000c007FFFFF)"
-definition "mbp_01  = (0x002C00000000, 0x002c007FFFFF)"  
-definition "sif     = (0x00F400000000, 0x00F7FFFFFFFF)" 
+definition "conf_00 = blockn 0x000800000000 0x0008007FFFFF"
+definition "conf_01 = blockn 0x002800000000 0x0028007FFFFF"
+definition "mpb_00  = blockn 0x000C00000000 0x000c007FFFFF"
+definition "mbp_01  = blockn 0x002C00000000 0x002c007FFFFF"  
+definition "sif     = blockn 0x00F400000000 0x00F7FFFFFFFF" 
 definition "node_0_interconnect = empty_spec \<lparr>
   acc_blocks := [],
   map_blocks := [block_map dram0 1 0x0, block_map dram1 2 0x0,
@@ -76,7 +76,7 @@ definition "node_0_interconnect = empty_spec \<lparr>
 \<rparr>"
   
 text {* Core 0.0 *}
-definition "vram = (0x0000000, 0x0FFFFFF)"
+definition "vram = blockn 0x0000000  0x0FFFFFF"
 definition "node_9_vas00 =  empty_spec \<lparr>
   acc_blocks := [],
   map_blocks := [block_map vram 10 0x0 ]
@@ -87,8 +87,8 @@ definition "cpu_phys =  empty_spec \<lparr>
   overlay := Some 11
 \<rparr>"
 
-definition "lut00_cfg = (0x3000000, 0x3FFFFFF)"
-definition "lut00_mpb = (0x1000000, 0x1FFFFFF)"
+definition "lut00_cfg = blockn 0x3000000 0x3FFFFFF"
+definition "lut00_mpb = blockn 0x1000000 0x1FFFFFF"
 definition "node_11_lut00  =  empty_spec \<lparr>
   acc_blocks := [],
   map_blocks := [block_map lut00_cfg 5 0x0, block_map lut00_mpb 6 0x0],
@@ -101,8 +101,8 @@ definition "node_12_vas01 =  empty_spec \<lparr>
   map_blocks := [block_map vram 13 0x0 ]
 \<rparr>"
 
-definition "lut01_cfg = (0x3000000, 0x3FFFFFF)"
-definition "lut01_mpb = (0x1000000, 0x1FFFFFF)"
+definition "lut01_cfg = blockn 0x3000000 0x3FFFFFF"
+definition "lut01_mpb = blockn 0x1000000 0x1FFFFFF"
 definition "node_14_lut01  =  empty_spec \<lparr>
   acc_blocks := [],
   map_blocks := [block_map lut01_cfg 6 0x0, block_map lut01_mpb 7 0x0],

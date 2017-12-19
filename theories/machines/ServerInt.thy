@@ -39,7 +39,7 @@ definition "phi1_elapic_rcv0 = 0x29" (* Vec=0x29, Dest=0, Fixed destination mode
 definition "phi0_msi_write0 = 0x00000000FEE002B800000029"
 definition "phi1_msi_write0 = 0x00000000FEE002B80000007D"
 
-definition "x86_vec_domain = (32,255)"
+definition "x86_vec_domain =  blockn 32 255"
 
 text {* Host LAPIC 0 *}
 definition "node_0_lapic0 = empty_spec \<lparr>
@@ -56,33 +56,33 @@ definition "node_1_lapic1 = empty_spec \<lparr>
 text {* Core 0 to APICs *}   
 definition "node_2_core0 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 3 251]
+  map_blocks := [one_map (0, {}) 3 251]
 \<rparr>"
   
 text {* Core 1 to APICs *}   
 definition "node_3_core1 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 3 251]
+  map_blocks := [one_map (0, {}) 3 251]
 \<rparr>"
   
 text {* Timer0 to LAPIC0 *}   
 definition "node_4_timer0 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 0 32]
+  map_blocks := [one_map (0, {}) 0 32]
 \<rparr>"
   
 text {* Timer1 to LAPIC1 *}   
 definition "node_5_timer1 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 1 32]
+  map_blocks := [one_map (0, {}) 1 32]
 \<rparr>"
   
 text {* IOMMU to LAPICs. *}              
 definition "node_6_iommu = empty_spec \<lparr>
   acc_blocks := [],
   map_blocks := [
-    one_map phi0_msi_write0 0 125,
-    one_map phi1_msi_write0 0 126
+    one_map (phi0_msi_write0, {}) 0 125,
+    one_map (phi1_msi_write0, {}) 0 126
 ]
 \<rparr>"
 
@@ -101,50 +101,50 @@ definition "node_8_phi0_lapic1 = empty_spec \<lparr>
 text {* Phi0 Core 0 to APICs *}
 definition "node_9_phi0_core0 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 8 251]
+  map_blocks := [one_map (0, {}) 8 251]
 \<rparr>"
   
 text {* Phi0 Core 1 to APICs *}
 definition "node_10_phi0_core1 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 7 251]
+  map_blocks := [one_map (0, {}) 7 251]
 \<rparr>"
   
 text {* Phi0 Timer0 to Phi0 LAPIC0 *}   
 definition "node_11_phi0_timer0 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 7 32]
+  map_blocks := [one_map (0, {}) 7 32]
 \<rparr>"
   
 text {* Phi0 Timer1 to Phi0 LAPIC1 *}   
 definition "node_12_phi0_timer1 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 8 32]
+  map_blocks := [one_map (0, {}) 8 32]
 \<rparr>"
   
 text {* Phi0 IOAPIC0 -> LAPICs *}              
 definition "node_13_phi0_ioapic = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 7 33]
+  map_blocks := [one_map (0, {}) 7 33]
 \<rparr>" 
   
 text {* Phi0 Thermal to IOAPIC *}              
 definition "node_14_phi0_rtc = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 13 0]
+  map_blocks := [one_map (0, {}) 13 0]
 \<rparr>" 
   
 text {* Phi0 ELAPIC to LAPICs *}
 definition "node_15_elapic = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map phi0_elapic_rcv0 7 0x29]
+  map_blocks := [one_map (phi0_elapic_rcv0, {}) 7 0x29]
 \<rparr>"
   
 text {* Phi0 SBOX to IOMMU *}
 definition "node_16_sbox = empty_spec \<lparr>
   acc_blocks := [],
  (* There should be a more expressive way of modeling the input *)
-  map_blocks := [one_map 0 5 phi0_msi_write0]
+  map_blocks := [one_map (0, {}) 5 phi0_msi_write0]
 \<rparr>"
 
 text {* Phi1 LAPIC0 *}
@@ -162,50 +162,50 @@ definition "node_18_phi1_lapic1 = empty_spec \<lparr>
 text {* Phi1 Core 0 to APICs *}
 definition "node_19_phi1_core0 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 18 251]
+  map_blocks := [one_map (0, {}) 18 251]
 \<rparr>"
   
 text {* Phi1 Core 1 to APICs *}
 definition "node_20_phi1_core1 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 17 251]
+  map_blocks := [one_map (0, {}) 17 251]
 \<rparr>"
   
 text {* Phi1 Timer0 to Phi1 LAPIC0 *}
 definition "node_21_phi1_timer0 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 17 32]
+  map_blocks := [one_map (0, {}) 17 32]
 \<rparr>"
   
 text {* Phi1 Timer1 to Phi1 LAPIC1 *}
 definition "node_22_phi1_timer1 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 18 32]
+  map_blocks := [one_map (0, {}) 18 32]
 \<rparr>"
   
 text {* Phi1 IOAPIC0 to LAPICs *}              
 definition "node_23_phi1_ioapic = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 17 33]
+  map_blocks := [one_map (0, {}) 17 33]
 \<rparr>" 
   
 text {* Phi1 Thermal to IOAPIC *}              
 definition "node_24_phi1_rtc = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 23 0]
+  map_blocks := [one_map (0, {}) 23 0]
 \<rparr>" 
   
 text {* Phi1 ELAPIC to LAPICs *}              
 definition "node_25_elapic = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map phi1_elapic_rcv0 17 0x29]
+  map_blocks := [one_map (phi1_elapic_rcv0, {}) 17 0x29]
 \<rparr>"
   
 text {* Phi1 SBOX to IOMMU *}              
 definition "node_26_sbox = empty_spec \<lparr>
   acc_blocks := [],
  (* There should be a more expressive way of modeling the input *)
-  map_blocks := [one_map 0 5 phi1_msi_write0]
+  map_blocks := [one_map (0, {}) 5 phi1_msi_write0]
 \<rparr>"
   
 definition "sys = [

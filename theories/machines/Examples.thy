@@ -30,10 +30,10 @@ theory Examples
   imports "../model/Syntax"
 begin
 
-definition "loram = (0x000001000, 0x01fffffff)"
-definition "lapic = (0xb00000000, 0x0b000ffff)"
-definition "mmio =  (0xb00001000, 0x0b0001fff)"
-definition "hiram = (0x100000000, 0x1ffffffff)"
+definition "loram = blockn 0x000001000 0x01fffffff"
+definition "lapic = blockn 0xb00000000 0x0b000ffff"
+definition "mmio =  blockn 0xb00001000 0x0b0001fff"
+definition "hiram = blockn 0x100000000 0x1ffffffff"
 
 text {* Node 0, the interconnect. *}
 definition "interconnect = empty_spec \<lparr>
