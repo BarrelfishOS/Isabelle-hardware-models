@@ -426,11 +426,10 @@ definition mk_net :: "net_spec \<Rightarrow> net"
   where "mk_net ns = mk_net_step {0..<4} ns"
 *)
 
-definition "relevant_props = {0..<128}"
 
 primrec mk_net :: "net_spec \<Rightarrow> net"
   where "mk_net [] = empty_net" |
-        "mk_net (s#ss) = (mk_net ss)(fst s := mk_node relevant_props (snd s))"
+        "mk_net (s#ss) = (mk_net ss)(fst s := mk_node ALLPROPERTIES (snd s))"
 
 
 (*<*)
@@ -581,7 +580,7 @@ lemma wf_mk_net:
 lemma wf_mk_net:
   "wf_net (mk_net ss)"
   by(rule wf_node_wf_net, induct ss, simp_all add:empty_net_def 
-          wf_empty_node wf_mk_node relevant_props_def)
+          wf_empty_node wf_mk_node ALLPROPERTIES_def)
 
 
 
@@ -671,8 +670,8 @@ proof(induct s, simp add:decodes_to_empty_net)
   show "fst x < ff_net (s # ss)"
   proof(cases)
     assume "fst y = fst s"
-    with  dec have "x \<in> translate (mk_node relevant_props (snd s)) (snd y)"
-      by(cases x, cases y, simp add:decodes_to_def decode_step_def relevant_props_def)
+    with  dec have "x \<in> translate (mk_node ALLPROPERTIES (snd s)) (snd y)"
+      by(cases x, cases y, simp add:decodes_to_def decode_step_def ALLPROPERTIES_def)
     hence "fst x < ff_node (snd s)"
       by(cases x, auto intro:ff_node_ub)
     thus ?thesis by(simp)

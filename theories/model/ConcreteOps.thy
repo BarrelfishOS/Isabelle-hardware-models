@@ -158,16 +158,16 @@ proof(induct ss, simp)
     
   have "mk_net (split_all_C off (s # ss)) =
         (mk_net (split_all_C off ss))
-          (fst s := redirector_node (off + fst s) (mk_node relevant_props (snd s)),
-           off + fst s := acceptor_node (mk_node relevant_props (snd s)))"
+          (fst s := redirector_node (off + fst s) (mk_node ALLPROPERTIES (snd s)),
+           off + fst s := acceptor_node (mk_node ALLPROPERTIES (snd s)))"
     by(simp add:redirector_rel acceptor_rel)
   also from distinct bound IH
   have "... =
         (?Y ss)
-          (fst s := redirector_node (off + fst s) (mk_node relevant_props (snd s)),
-           off + fst s := acceptor_node (mk_node relevant_props (snd s)))"
+          (fst s := redirector_node (off + fst s) (mk_node ALLPROPERTIES (snd s)),
+           off + fst s := acceptor_node (mk_node ALLPROPERTIES (snd s)))"
     by(simp)
-  also have "... = split_node (fst s) (off + fst s) ((?Y ss)(fst s := mk_node relevant_props (snd s)))"
+  also have "... = split_node (fst s) (off + fst s) ((?Y ss)(fst s := mk_node ALLPROPERTIES (snd s)))"
     by(simp add:split_node_def)
   also {
     let ?prev = "..."

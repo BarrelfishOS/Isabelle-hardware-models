@@ -2516,17 +2516,25 @@ text "Create the decoding net node. Each TLB entry has either zero, one or two m
 subsection "Helper Functions"
 (* ------------------------------------------------------------------------- *) 
   
-text{* Creates a mapspec list from the odd and even entries *}
+text{* Creates a mapspec list from the odd and even entries. We currently deal with two
+       properties. If the write permissions dirty are set, then read and write requests
+       can be handled. If it's not set then writes are not allowed *}
 
-(* TODO:  PROPERTIES ! *)
+definition EntryPropertyMatch :: "TLBENTRYLO \<Rightarrow> addr \<Rightarrow> bool"
+  where "EntryPropertyMatch e a = (if (d e) then 
+                                     True  
+                                   else 
+                                     PWRITE \<notin> (snd a))"
+
+
     
 definition EntryToMap :: "nodeid \<Rightarrow> TLBENTRY \<Rightarrow> addr \<Rightarrow> name set"
   where
     "EntryToMap nd e va =
-      (if EntryIsValid0 e \<and> (fst va) \<in> EntryExtendedRange0 e then 
-          {(nd, (EntryPA0 e + (((fst va) mod VASize) - EntryMinVA0 e)), {})} else {}) \<union>
-      (if EntryIsValid1 e \<and> (fst va) \<in> EntryExtendedRange1 e then
-           {(nd, (EntryPA1 e + (((fst va) mod VASize) - EntryMinVA1 e)), {})} else {})"      
+      (if EntryIsValid0 e \<and> (EntryPropertyMatch (lo0 e) va) \<and> (fst va) \<in> EntryExtendedRange0 e then 
+          {(nd, (EntryPA0 e + (((fst va) mod VASize) - EntryMinVA0 e)), (snd va))} else {}) \<union>
+      (if EntryIsValid1 e \<and> (EntryPropertyMatch (lo1 e) va) \<and> (fst va) \<in> EntryExtendedRange1 e then
+           {(nd, (EntryPA1 e + (((fst va) mod VASize) - EntryMinVA1 e)), (snd va))} else {})"      
     
 
 (* ------------------------------------------------------------------------- *)  
@@ -2799,7 +2807,7 @@ qed
 section "Translate Function"
 (* ========================================================================= *) 
   
-definition TLBENTRY_translate_va :: "TLBENTRY \<Rightarrow> nat \<Rightarrow> nat set"
+definition TLBENTRY_translate_va :: "TLBENTRY \<Rightarrow> genaddr \<Rightarrow> nat set"
   where
     "TLBENTRY_translate_va e va =
       (if EntryIsValid0 e \<and> va \<in> EntryExtendedRange0 e then 
@@ -2847,13 +2855,6 @@ text "The translate function of an initialized TLB is always emtpy"
 lemma "MIPSTLB_translate (MIPSTLBInit c w tlb) as vpn = {}"
   by(simp add:MIPSTLB_translate_def MIPSTLBInit_def TLBENTRY_translate_empty)
   
-
-
-    
-lemma "\<And>vpn as. MIPSTLB_try_translate t as vpn = EXNREFILL \<Longrightarrow>
-        MIPSTLB_translate t as vpn = {}"
-  oops
-    
     
 
 lemma MIPSTLB_fault_no_translate:
@@ -2868,14 +2869,6 @@ proof -
 qed
       
     
-    
-(*
-MIPSTLB_try_translate_exist_match :
-    assumes translates:  "MIPSTLB_try_translate tlb as vpn \<noteq> EXNREFILL"
-    shows "(\<exists>i<capacity tlb. EntryMatchVPNASID vpn as (entries tlb i))"
-
-
- *)    
     
 (*<*)
 end

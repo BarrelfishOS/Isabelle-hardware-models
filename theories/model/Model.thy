@@ -44,7 +44,11 @@ text "First, we nail down some types.  For ease in getting started, we're using 
 
 type_synonym nodeid = nat
 type_synonym genaddr = nat
-type_synonym property = nat
+
+datatype property = PREAD | PWRITE
+definition "ALLPROPERTIES = {PREAD, PWRITE}"
+
+(* type_synonym property = nat *)
 
 
 type_synonym addr = "genaddr \<times> property set"
