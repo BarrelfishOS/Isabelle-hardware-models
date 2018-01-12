@@ -50,17 +50,40 @@ record CONTROLLER_CLASS =
   out_port_num :: nat
   map_valid :: "(IRQ \<Rightarrow> IRQ set) set"
 
+
+
+
+(*
+definition extend_map "IRQ \<Rightarrow> (IRQ, IRQ set) \<Rightarrow> (IRQ \<Rightarrow> IRQ set)"
+  where "extend_map A B = {\<lambda> x.  *)
+
 (* Configuration of a controller *)  
 record CONTROLLER =
   map      :: "IRQ \<Rightarrow> IRQ set"
+
+definition replace_map :: "CONTROLLER \<Rightarrow> IRQ \<Rightarrow> IRQ set \<Rightarrow> CONTROLLER"
+  where "replace_map orig new_inp new_out = orig \<lparr> map := (\<lambda>i. (if i = new_inp then new_out else (map orig) i)) \<rparr>"  
  
 (* Interconnect of the system + each controller with a class *)
 record SYSTEM =
   controller :: "CONTROLLER_NAME \<Rightarrow> (CONTROLLER \<times> CONTROLLER_CLASS) option"
   net :: "CONTROLLER_NAME \<Rightarrow> nat \<Rightarrow> (CONTROLLER_NAME \<times> nat) set"
+
+(* In system at controller name, replace its mapping from new_inp to new_outp *)
+definition replace_system :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> IRQ \<Rightarrow> IRQ set \<Rightarrow> SYSTEM"
+  where "replace_system orig name new_inp new_out = orig \<lparr>
+    net := (net orig),
+    controller := (\<lambda>c. (if c = name then (
+                   (case ((controller orig) c) of Some cr \<Rightarrow> Some (replace_map (fst cr) new_inp new_out, snd cr) | _ \<Rightarrow> None)
+                ) else (controller orig) c))\<rparr>"
   
 (* look at decoding net to verify *)
 (* assuming system is valid, configuration update \<Rightarrow> system valid *)  
+
+(* IRQ is of format FMEMWRITE *)
+definition irq_is_memwrite :: "IRQ \<Rightarrow> bool"
+  where "irq_is_memwrite x = (case format x of FMEMWRITE a b \<Rightarrow> True | _ \<Rightarrow> False)"
+
 
 (* Arguments that do not produce an empty set, see dom *)
 definition doms :: "('a \<Rightarrow> 'b set) \<Rightarrow> 'a set" where
@@ -145,6 +168,19 @@ definition conf_to_translate :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarr
 definition mk_node :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> node"
   where "mk_node s c = (case (sys_ctrl_act_conf s c) of None \<Rightarrow> empty_node |
          Some conf \<Rightarrow> \<lparr>accept = {}, translate = conf_to_translate s c \<rparr>)"
+
+(* ------------------------------------------------------------------------- *)  
+subsection "Lifting Result"
+(* ------------------------------------------------------------------------- *)   
+(* definition config_change :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> SYSTEM"
+  where "config_change sys ctrl = replace_system sys ctrl \<lparr>format = FEMPTY, port = 0 \<rparr>" *)
+
+(*  definition config_change_node :: "" *)
+
+(* assume change is in set of mapvalid *)
+(* lemma blu : "mk_node S (config_change Ctrl) = config_change_node (mk_node S Ctrl)" *)
+
+(* lemma blu: "mk_net  *)
     
 definition mk_net :: "SYSTEM \<Rightarrow> net"
   where "mk_net s = (\<lambda>nodeid. mk_node s nodeid)"
