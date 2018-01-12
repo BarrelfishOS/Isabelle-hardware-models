@@ -813,6 +813,7 @@ text "Next we show the equivalence of the translate function to be equal to
 lemma MipsTLBPT_translate_is:
   assumes inrange: "vpn < MIPSPT_EntriesMax"
     and inrange2: "as < ASIDMax"
+    and cap: "capacity (tlb mtlb) > 0"
     and  valid: "MipsTLBPT_valid mtlb"
   shows "MipsTLBPT_translate mtlb as vpn = 
            (if (v ((entry (pte mtlb)) vpn as))
@@ -901,8 +902,8 @@ proof cases
       by(auto simp add:MIPSTLB_fault_no_translate)
         
     have X10: " ... =  {pa | pa i. pa \<in> TLBENTRY_translate (MIPSPT_mk_tlbentry (pte mtlb) as vpn) as vpn \<and> i \<in> RandomIndexRange (tlb mtlb)}"
-      by(auto simp:RandomIndex_in_capacity)
-    
+      by(auto simp:RandomIndex_in_capacity cap)
+
      from tlbvalid have X11 : " ... =   (if (v ((entry  (pte mtlb)) vpn as)) then {(pfn ((entry   (pte mtlb)) vpn as))} else {})"
        by(auto simp add:MIPSPT_TLBENTRY_translate_is RandomIndexRange_def TLBValid_def)
    

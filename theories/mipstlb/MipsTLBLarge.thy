@@ -1119,7 +1119,7 @@ proof -
   
   have X0:  
     "TLBValid (MipsTLBLarge_create pt) =  
-      (wired (MipsTLBLarge_create pt) < capacity (MipsTLBLarge_create pt) \<and>
+      (wired (MipsTLBLarge_create pt) \<le> capacity (MipsTLBLarge_create pt) \<and>
        wired (MipsTLBLarge_create pt) < TLBMaximumWired \<and>
      (\<forall>i<capacity (MipsTLBLarge_create pt). 
         TLBEntryWellFormed (MipsTLBLarge_create pt) i 

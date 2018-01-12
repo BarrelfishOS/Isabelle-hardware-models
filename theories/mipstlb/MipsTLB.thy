@@ -1672,12 +1672,12 @@ definition ValidIndexRange :: "MIPSTLB \<Rightarrow> nat set"
   where "ValidIndexRange tlb =  {x.  0 \<le> x \<and> x < (capacity tlb)}"
   
 definition RandomIndexRange :: "MIPSTLB \<Rightarrow> nat set"  
-  where "RandomIndexRange tlb =  {x.  (wired tlb) \<le> x \<and> x < (capacity tlb)}"
+  where "RandomIndexRange tlb =  {x.  (wired tlb) \<le> x \<and> x < (capacity tlb)} \<union> {(capacity tlb) - 1}"
 
 
 lemma RandomIndex_in_capacity:
-"\<And>i. i \<in> RandomIndexRange tlb \<Longrightarrow>  i < (capacity tlb)"
-  by(simp add:RandomIndexRange_def)
+"\<And>i. (capacity tlb) > 0 \<Longrightarrow> i \<in> RandomIndexRange tlb \<Longrightarrow>  i < (capacity tlb)"
+  by(auto simp add:RandomIndexRange_def)
     
 
     
@@ -1756,16 +1756,16 @@ text "The TLB is in a valid state if all entries are valid with respect to
       modification of the TLB, this must hold. "
   
 definition TLBValid_orig :: "MIPSTLB \<Rightarrow> bool"
-  where "TLBValid_orig tlb = (((wired tlb) < (capacity tlb)  \<and> (wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+  where "TLBValid_orig tlb = (((wired tlb) \<le> (capacity tlb)  \<and> (wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                         (TLBEntryWellFormed tlb i) \<and> (
                         (i = j) \<or> \<not> EntryMatch ((entries tlb) i) ((entries tlb j)))))"    
 
 definition TLBValid:: "MIPSTLB \<Rightarrow> bool"
-  where "TLBValid tlb = (((wired tlb) < (capacity tlb)  \<and> (wired tlb) < TLBMaximumWired  ) \<and> (\<forall>i < (capacity tlb).  
+  where "TLBValid tlb = (((wired tlb) \<le> (capacity tlb)  \<and> (wired tlb) < TLBMaximumWired  ) \<and> (\<forall>i < (capacity tlb).  
                         (TLBEntryWellFormed tlb i) \<and> ((TLBEntryConflictSet (entries tlb i) tlb) \<subseteq> {i})))"    
 
 definition TLBValidER :: "MIPSTLB \<Rightarrow> bool"
-  where "TLBValidER tlb = (((wired tlb) < (capacity tlb) \<and> (wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb).  
+  where "TLBValidER tlb = (((wired tlb) \<le> (capacity tlb) \<and> (wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb).  
                         (TLBEntryWellFormed tlb i) \<and> ((TLBEntryConflictSetER (entries tlb i) tlb) \<subseteq> {i})))"      
     
     
@@ -1802,12 +1802,12 @@ proof -
   fix i j
   assume valid : "TLBValidER tlb"
   
-  from valid have wired: "wired tlb < TLBMaximumWired \<and>  wired tlb < capacity tlb" 
+  from valid have wired: "wired tlb < TLBMaximumWired \<and>  wired tlb \<le> capacity tlb" 
      by(simp add:TLBValidER_def valid)
   from valid have wellformed : " \<forall>j<(capacity tlb). TLBEntryWellFormed tlb j"
      by(simp add:TLBValidER_def valid)    
     
-   have X0: "TLBValidER tlb = (wired tlb < TLBMaximumWired \<and> wired tlb < capacity tlb \<and> (\<forall>i<(capacity tlb). 
+   have X0: "TLBValidER tlb = (wired tlb < TLBMaximumWired \<and> wired tlb \<le> capacity tlb \<and> (\<forall>i<(capacity tlb). 
                   TLBEntryWellFormed tlb i \<and> TLBEntryConflictSetER (entries tlb i) tlb \<subseteq> {i}))"
     by(auto simp add:TLBValidER_def) 
 
@@ -1833,12 +1833,12 @@ proof
   proof - 
     assume valid: "TLBValid tlb"
       
-    have X0: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired \<and>  wired tlb < capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+    have X0: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired \<and>  wired tlb \<le> capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                            (TLBEntryWellFormed tlb i) \<and> (
                            (i = j) \<or> \<not> EntryMatchER ((entries tlb) i) ((entries tlb j)))))"
       by(auto simp add:TLBValidER_def TLBEntryConflictSetER_def)
     
-    also  have X1: "TLBValid tlb =  (((wired tlb) < TLBMaximumWired  \<and>  wired tlb < capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+    also  have X1: "TLBValid tlb =  (((wired tlb) < TLBMaximumWired  \<and>  wired tlb \<le> capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                                 (TLBEntryWellFormed tlb i) \<and> (
                                 (i = j) \<or> \<not> EntryMatch ((entries tlb) i) ((entries tlb j)))))"
       by(auto simp add:TLBValid_def TLBEntryConflictSet_def)
@@ -1847,7 +1847,7 @@ proof
     with valid have wf: "\<forall>i < (capacity tlb). TLBENTRYWellFormed (entries tlb i)"
       by(auto simp add:TLBValidImpliesWellFormed)
     
-    with valid wf nz have X2: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired  \<and>  wired tlb < capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+    with valid wf nz have X2: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired  \<and>  wired tlb \<le> capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                            (TLBEntryWellFormed tlb i) \<and> (
                            (i = j) \<or> \<not> EntryMatch ((entries tlb) i) ((entries tlb j)))))"
       by(simp add:X0 EntryMatchEqualsEntryMatchER)
@@ -1861,12 +1861,12 @@ proof
   proof - 
     fix i
     assume valid: "TLBValidER tlb"
-    have X0: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired  \<and>  wired tlb < capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+    have X0: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired  \<and>  wired tlb \<le> capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                            (TLBEntryWellFormed tlb i) \<and> (
                            (i = j) \<or> \<not> EntryMatchER ((entries tlb) i) ((entries tlb j)))))"
       by(auto simp add:TLBValidER_def TLBEntryConflictSetER_def)
     
-    also  have X1: "TLBValid tlb =  (((wired tlb) < TLBMaximumWired  \<and>  wired tlb < capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+    also  have X1: "TLBValid tlb =  (((wired tlb) < TLBMaximumWired  \<and>  wired tlb \<le> capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                                 (TLBEntryWellFormed tlb i) \<and> (
                                 (i = j) \<or> \<not> EntryMatch ((entries tlb) i) ((entries tlb j)))))"
       by(auto simp add:TLBValid_def TLBEntryConflictSet_def)
@@ -1933,7 +1933,7 @@ next
   then show ?thesis 
   proof -
     from valid have X0: 
-      "(((wired tlb) < (capacity tlb)  \<and> (wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+      "(((wired tlb) \<le> (capacity tlb)  \<and> (wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                         (TLBEntryWellFormed tlb i) \<and> (
                         (i = j) \<or> \<not> EntryMatch ((entries tlb) i) ((entries tlb j)))))"
       by(auto simp add:TLBValid_def TLBValid_orig_def TLBEntryConflictSet_def)
@@ -2185,7 +2185,7 @@ lemma InvalidTLBNotValid :
   "(TLBValid invalid_tlb) = False"
 proof -
 
-  have wired: "wired invalid_tlb < capacity invalid_tlb"
+  have wired: "wired invalid_tlb \<le> capacity invalid_tlb"
     by(simp add:invalid_tlb_def MIPSR4600Capacity_def)
       
   have v: "TLBValid invalid_tlb = 
@@ -2345,12 +2345,12 @@ proof
                                     entries = (entries tlb)(idx := e)\<rparr>"
      by(simp add:tlbwi_def ir)
       
-   have X1:  "TLBValid tlb \<Longrightarrow>(wired tlb) < (capacity tlb) \<and> (wired tlb) < TLBMaximumWired "
+   have X1:  "TLBValid tlb \<Longrightarrow>(wired tlb) \<le> (capacity tlb) \<and> (wired tlb) < TLBMaximumWired "
      by(simp add: TLBValid_def)
        
    have X2:  "(wired  \<lparr>capacity = capacity tlb, 
                      wired = wired tlb, 
-                     entries = (entries tlb)(idx := e)\<rparr>) < (capacity  \<lparr>capacity = capacity tlb, 
+                     entries = (entries tlb)(idx := e)\<rparr>) \<le> (capacity  \<lparr>capacity = capacity tlb, 
                      wired = wired tlb, 
                      entries = (entries tlb)(idx := e)\<rparr>) \<and> (wired \<lparr>capacity = capacity tlb, 
                      wired = wired tlb, 
@@ -2420,7 +2420,7 @@ definition tlbwr2 :: "TLBENTRY \<Rightarrow> MIPSTLB \<Rightarrow> MIPSTLB set" 
    
    
 lemma MIPSTLB_randwr:
-   "tlbwr e tlb = tlbwr2 e tlb"
+   "capacity tlb > 0 \<Longrightarrow> tlbwr e tlb = tlbwr2 e tlb"
   by(simp add:tlbwr_def tlbwr2_def RandomIndexRange_def tlbwi_def, auto)
          
    
