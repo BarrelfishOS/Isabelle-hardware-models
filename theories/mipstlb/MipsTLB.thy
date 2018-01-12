@@ -310,6 +310,7 @@ text "The EntryHi stores the Virtual Page Number of the entry pair and the
       Address space identifier of the entry."
   
 record TLBENTRYHI = 
+  region :: nat
   vpn2 :: VPN
   asid :: ASID
 
@@ -323,7 +324,7 @@ definition TLBENTRYHIWellFormed :: "TLBENTRYHI \<Rightarrow> MASK \<Rightarrow> 
 text "The NullEntryHi has the VPN2 of 0 and the ASID of 0. "  
 
 definition null_entry_hi :: TLBENTRYHI
-  where "null_entry_hi = \<lparr> vpn2=0, asid=0 \<rparr>"
+  where "null_entry_hi = \<lparr> region=0, vpn2=0, asid=0 \<rparr>"
     
     
 text "The NullEntryHi is valid."    
@@ -393,7 +394,7 @@ text "We define the reset function on the TLBEntry to set the EntryLo to zero
      multiply the index with two."    
   
 definition TLBEntryReset :: "nat \<Rightarrow> TLBENTRY"
-  where "TLBEntryReset idx = TLBENTRY.make MASK4K \<lparr> vpn2=(idx * 2), asid=0 \<rparr> 
+  where "TLBEntryReset idx = TLBENTRY.make MASK4K \<lparr> region=0, vpn2=(idx * 2), asid=0 \<rparr> 
                                            null_entry_lo null_entry_lo"
 
 text "The NullEntry is the rest with index 0"
@@ -464,7 +465,7 @@ definition MIPSR4600Capacity :: nat
   where "MIPSR4600Capacity = 48"
     
 definition TLBMaximumWired :: nat
-  where "TLBMaximumWired  = 32"
+  where "TLBMaximumWired  = 48"
 
 text "The following creates an invalid TLB, which also satisfies that state
       after reset."

@@ -389,10 +389,10 @@ text "For a particular ASID and VPN we can create the TLB EntryPair as
 definition MIPSPT_mk_tlbentry :: "MIPSPT \<Rightarrow> ASID \<Rightarrow> VPN \<Rightarrow> TLBENTRY"
   where "MIPSPT_mk_tlbentry pt as vpn = 
         (if (even vpn) then
-            TLBENTRY.make MASK4K \<lparr> vpn2=vpn, asid=as \<rparr> 
+            TLBENTRY.make MASK4K \<lparr> region=0, vpn2=vpn, asid=as \<rparr> 
                           ((entry pt) vpn as) ((entry pt) (vpn + 1) as) 
            else  
-            TLBENTRY.make MASK4K \<lparr> vpn2=(vpn-1), asid=as \<rparr> 
+            TLBENTRY.make MASK4K \<lparr> region=0, vpn2=(vpn-1), asid=as \<rparr> 
                           ((entry pt) (vpn - 1) as) ((entry pt) vpn as ))"
    
 (* ------------------------------------------------------------------------- *)   

@@ -778,7 +778,7 @@ next
                  MipsTLBLarge_EntryPairs_def MIPSPT_EntriesMax_def)
         
     from vodd have X3 : "MIPSPT_mk_tlbentry pt as vpn = 
-          TLBENTRY.make MASK4K \<lparr>vpn2 = vpn - Suc 0, asid = as\<rparr> 
+          TLBENTRY.make MASK4K \<lparr>region=0,vpn2 = vpn - Suc 0, asid = as\<rparr> 
                        (entry pt (vpn - Suc 0) as) (entry pt vpn as)"
       by(simp add:MIPSPT_mk_tlbentry_def)
     
@@ -786,7 +786,7 @@ next
       "MIPSPT_mk_tlbentry pt (MipsTLBLarge_idx2asid (MipsTLBLarge_mk_idx as vpn)) 
                              (MipsTLBLarge_idx2vpn (MipsTLBLarge_mk_idx as vpn)) = 
         TLBENTRY.make MASK4K 
-          \<lparr>vpn2 = MipsTLBLarge_idx2vpn (MipsTLBLarge_mk_idx as vpn), 
+          \<lparr>region=0, vpn2 = MipsTLBLarge_idx2vpn (MipsTLBLarge_mk_idx as vpn), 
           asid = MipsTLBLarge_idx2asid (MipsTLBLarge_mk_idx as vpn)\<rparr>
           (entry pt (MipsTLBLarge_idx2vpn (MipsTLBLarge_mk_idx as vpn)) 
                     (MipsTLBLarge_idx2asid (MipsTLBLarge_mk_idx as vpn)))
@@ -796,7 +796,7 @@ next
                  MipsTLBLarge_mk_idx_in_num_entries)  
     
     from X2 have X5:  " ... = TLBENTRY.make MASK4K 
-          \<lparr>vpn2 = MipsTLBLarge_idx2vpn (MipsTLBLarge_mk_idx as vpn), asid = as\<rparr>
+          \<lparr>region=0, vpn2 = MipsTLBLarge_idx2vpn (MipsTLBLarge_mk_idx as vpn), asid = as\<rparr>
           (entry pt (MipsTLBLarge_idx2vpn (MipsTLBLarge_mk_idx as vpn)) as )
           (entry pt (Suc (MipsTLBLarge_idx2vpn (MipsTLBLarge_mk_idx as vpn))) as)"
       by(auto)
