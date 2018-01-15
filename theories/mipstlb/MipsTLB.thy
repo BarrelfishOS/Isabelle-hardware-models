@@ -110,7 +110,7 @@ subsection "Virtual Page Number"
 (* ------------------------------------------------------------------------- *)  
   
 text "The Virtual Page Number (VPN) identifies a page of a given size in a 
-      40-bit virtual address space (1 TB)"
+      40-bit virtual genaddress space (1 TB)"
 
 definition VASize :: nat 
   where "VASize = 1099511627776"   (* 1TB *)    
@@ -174,7 +174,7 @@ subsection "Physical Frame Number"
 (* ------------------------------------------------------------------------- *)  
 
 text "The Physical Frame Number (PFN) is an index into the array of physical frames.
-      There is a physical address space of 36 bits or 64 GB. The maximum number of 
+      There is a physical genaddress space of 36 bits or 64 GB. The maximum number of 
       frames depends on the actual frame size i.e. the MASK. "
   
 definition PASize :: nat 
@@ -206,7 +206,7 @@ definition PFNValidSet :: "MASK \<Rightarrow> nat set"
     
 
 text "The following lemmas proof that the maximum PFN multiplied by the
-      actual page number is always the physical address space size."
+      actual page number is always the physical genaddress space size."
   
 lemma  "((PFNMax m) + 1) * (page_size m) = PASize"
   by(cases m, simp_all add:PFNMax_def PASize_def GB_def MB_def KB_def)
@@ -223,7 +223,7 @@ subsection "Address Space Identifier"
 (* ------------------------------------------------------------------------- *)    
   
 text "The Address Space Identifier (ASID) is an 8-bit number identifying the 
-      current address space that is active and hence the 'view' of the system"
+      current genaddress space that is active and hence the 'view' of the system"
 
 type_synonym ASID = nat
   
@@ -287,7 +287,7 @@ subsection "Compound Types"
 (* ------------------------------------------------------------------------- *)
   
 text "Based on the those base types we can define more complex types like virtual
-     address and physical address as follows"
+     genaddress and physical genaddress as follows"
     
 type_synonym VA = "ASID \<times> VPN \<times> OFFSET"
 type_synonym PA = "PFN \<times> OFFSET"
@@ -310,6 +310,7 @@ text "The EntryHi stores the Virtual Page Number of the entry pair and the
       Address space identifier of the entry."
   
 record TLBENTRYHI = 
+  region :: nat
   vpn2 :: VPN
   asid :: ASID
 
@@ -323,7 +324,7 @@ definition TLBENTRYHIWellFormed :: "TLBENTRYHI \<Rightarrow> MASK \<Rightarrow> 
 text "The NullEntryHi has the VPN2 of 0 and the ASID of 0. "  
 
 definition null_entry_hi :: TLBENTRYHI
-  where "null_entry_hi = \<lparr> vpn2=0, asid=0 \<rparr>"
+  where "null_entry_hi = \<lparr> region=0, vpn2=0, asid=0 \<rparr>"
     
     
 text "The NullEntryHi is valid."    
@@ -393,7 +394,7 @@ text "We define the reset function on the TLBEntry to set the EntryLo to zero
      multiply the index with two."    
   
 definition TLBEntryReset :: "nat \<Rightarrow> TLBENTRY"
-  where "TLBEntryReset idx = TLBENTRY.make MASK4K \<lparr> vpn2=(idx * 2), asid=0 \<rparr> 
+  where "TLBEntryReset idx = TLBENTRY.make MASK4K \<lparr> region=0, vpn2=(idx * 2), asid=0 \<rparr> 
                                            null_entry_lo null_entry_lo"
 
 text "The NullEntry is the rest with index 0"
@@ -455,6 +456,7 @@ text "The MIPS TLB has a fixed number of entries ('capacity') where some of them
 record MIPSTLB = 
   capacity  :: nat
   wired     :: nat
+  random    :: nat
   entries   :: "nat \<Rightarrow> TLBENTRY"
 
   
@@ -464,7 +466,7 @@ definition MIPSR4600Capacity :: nat
   where "MIPSR4600Capacity = 48"
     
 definition TLBMaximumWired :: nat
-  where "TLBMaximumWired  = 32"
+  where "TLBMaximumWired  = 48"
 
 text "The following creates an invalid TLB, which also satisfies that state
       after reset."
@@ -472,6 +474,7 @@ text "The following creates an invalid TLB, which also satisfies that state
 definition invalid_tlb :: "MIPSTLB"
   where "invalid_tlb = \<lparr> capacity = MIPSR4600Capacity, 
                          wired    = 0, 
+                         random   = MIPSR4600Capacity - 1,
                          entries  = (\<lambda>_. null_entry) \<rparr>"    
 
     
@@ -526,22 +529,22 @@ subsection "Obtaining the minimum and maximum VA"
 text {* The entry pair maps the range [EntryMinVA, EntryMaxVA). Divided into two
         ranges [EntryMinVA0, EntryMaxVA0] and [EntryMinVA1, EntryMaxVA1]  *}
 
-definition EntryMinVA :: "TLBENTRY \<Rightarrow> addr" where
+definition EntryMinVA :: "TLBENTRY \<Rightarrow> genaddr" where
   "EntryMinVA e = (vpn2 (hi e)) * page_size (mask e)"
   
-definition EntryMaxVA :: "TLBENTRY \<Rightarrow> addr" where
+definition EntryMaxVA :: "TLBENTRY \<Rightarrow> genaddr" where
   "EntryMaxVA e = (EntryMinVA e) + (EntrySize e) + (EntrySize e) - 1"
   
-definition EntryMinVA0 :: "TLBENTRY \<Rightarrow> addr" where
+definition EntryMinVA0 :: "TLBENTRY \<Rightarrow> genaddr" where
   "EntryMinVA0 e = (EntryMinVA e)"
   
-definition EntryMaxVA0 :: "TLBENTRY \<Rightarrow> addr" where
+definition EntryMaxVA0 :: "TLBENTRY \<Rightarrow> genaddr" where
   "EntryMaxVA0 e = ((EntryMinVA0 e) + (EntrySize e) - 1)"
   
-definition EntryMinVA1 :: "TLBENTRY \<Rightarrow> addr" where
+definition EntryMinVA1 :: "TLBENTRY \<Rightarrow> genaddr" where
   "EntryMinVA1 e = ((EntryMinVA e) + (EntrySize e))"   
   
-definition EntryMaxVA1 :: "TLBENTRY \<Rightarrow> addr" where
+definition EntryMaxVA1 :: "TLBENTRY \<Rightarrow> genaddr" where
   "EntryMaxVA1 e = EntryMaxVA e"
  
   
@@ -572,25 +575,25 @@ lemma MaxVANullEntry : "EntryMaxVA null_entry = 8191"
 subsection "TLB Entry ASID ranges"
 (* ------------------------------------------------------------------------- *)      
     
-definition EntryASIDRange :: "TLBENTRY \<Rightarrow> addr set"
+definition EntryASIDRange :: "TLBENTRY \<Rightarrow> genaddr set"
   where "EntryASIDRange e = (if EntryIsGlobal e 
                              then {x. ASIDMin \<le> x \<and> x < ASIDMax} 
                              else {(asid (hi e))})"
     
 (* ------------------------------------------------------------------------- *)      
-subsection "TLB Entry address ranges"
+subsection "TLB Entry genaddress ranges"
 (* ------------------------------------------------------------------------- *)          
 
-text "From the minimum and maximum addresses we can now define the range of
-      addresses and entry spans i.e. the set of addresses"
+text "From the minimum and maximum genaddresses we can now define the range of
+      genaddresses and entry spans i.e. the set of genaddresses"
   
-definition EntryRange :: "TLBENTRY \<Rightarrow> addr set"
+definition EntryRange :: "TLBENTRY \<Rightarrow> genaddr set"
   where "EntryRange e =  {x.  (EntryMinVA e) \<le> x \<and> x \<le> (EntryMaxVA e)}"
   
-definition EntryRange0 :: "TLBENTRY \<Rightarrow> addr set" 
+definition EntryRange0 :: "TLBENTRY \<Rightarrow> genaddr set" 
   where "EntryRange0 e =  {x.  (EntryMinVA0 e) \<le> x \<and> x \<le> (EntryMaxVA0 e)}"  
 
-definition EntryRange1 :: "TLBENTRY \<Rightarrow> addr set" 
+definition EntryRange1 :: "TLBENTRY \<Rightarrow> genaddr set" 
   where "EntryRange1 e =  {x.  (EntryMinVA1 e) \<le> x \<and> x \<le> (EntryMaxVA1 e)}"
     
 text "the range covered by the full entry must be the union of the two entries"
@@ -603,7 +606,7 @@ lemma entry_range_union:  "EntryRange e = (EntryRange0 e) \<union> (EntryRange1 
 lemma EntryRangeNullEntry : "EntryRange null_entry = {x.  0 \<le> x \<and> x \<le> 8191}"
   by(auto simp: EntryRange_def MinVANullEntry MaxVANullEntry)
 
-text "A wellformed entry has a range with falls within the virtual address space."
+text "A wellformed entry has a range with falls within the virtual genaddress space."
     
 lemma TLBENTRYWellFormedEntryRangeValid :
   "TLBENTRYWellFormed e1 \<Longrightarrow>  \<forall> x \<in> EntryRange e1. x < VASize"
@@ -620,9 +623,9 @@ subsection "Extended Address Ranges"
 (* ------------------------------------------------------------------------- *)      
 
   
-text "The extended address is the address extended with the address space identifier.
-      we define the function to take a set of addresses and ASIDs and then expand any
-      address with all the ASIDs. "
+text "The extended genaddress is the genaddress extended with the genaddress space identifier.
+      we define the function to take a set of genaddresses and ASIDs and then expand any
+      genaddress with all the ASIDs. "
   
 definition mk_extended_range :: "nat set \<Rightarrow> nat set \<Rightarrow> nat set"
   where "mk_extended_range A R = 
@@ -663,7 +666,7 @@ subsubsection "Extended Range Unions"
 (* ------------------------------------------------------------------------- *) 
   
   
-lemma mk_extended_range_addr_union: 
+lemma mk_extended_range_genaddr_union: 
   "mk_extended_range X (A \<union> B) = (mk_extended_range X A) \<union> (mk_extended_range X B)"
   by(auto simp:mk_extended_range_def)
 
@@ -683,7 +686,7 @@ subsubsection "Extended Range Intersections"
 (* ------------------------------------------------------------------------- *) 
   
   
-lemma mk_extended_range_addr_inter: 
+lemma mk_extended_range_genaddr_inter: 
  assumes spaceA:  "\<forall>a\<in>A . a < VASize" 
     and  spaceB:  "\<forall>b\<in>B . b < VASize" 
   shows "mk_extended_range X (A \<inter> B) = 
@@ -885,7 +888,7 @@ next
 qed   
   
     
-lemma mk_extended_range_empty_addr_inter :
+lemma mk_extended_range_empty_genaddr_inter :
   assumes nempty : "X \<noteq> {}"
   shows  "(A \<inter> B = {}) = (mk_extended_range X (A \<inter> B) = {})"
 proof 
@@ -920,7 +923,7 @@ next
 qed    
   
 
-lemma mk_extended_range_empty_addr_inter2 :
+lemma mk_extended_range_empty_genaddr_inter2 :
   assumes spaceA:  "\<forall>a\<in>A . a < VASize" 
       and spaceB:  "\<forall>b\<in>B . b < VASize"
       and nz: "VASize \<noteq> 0"
@@ -935,19 +938,19 @@ subsection "TLB Entry Extended Address Ranges"
 (* ------------------------------------------------------------------------- *) 
   
     
-definition EntryExtendedRange :: "TLBENTRY \<Rightarrow> addr set"
+definition EntryExtendedRange :: "TLBENTRY \<Rightarrow> genaddr set"
   where "EntryExtendedRange e =  (if (EntryIsGlobal e) then
                                     (mk_extended_range ASIDValidSet (EntryRange e))
                                   else  
                                     (mk_extended_range {asid (hi e)} (EntryRange e)))"
   
-definition EntryExtendedRange0 :: "TLBENTRY \<Rightarrow> addr set" 
+definition EntryExtendedRange0 :: "TLBENTRY \<Rightarrow> genaddr set" 
   where "EntryExtendedRange0 e =   (if (EntryIsGlobal e) then
                                      (mk_extended_range ASIDValidSet  (EntryRange0 e))
                                    else
                                      (mk_extended_range {asid (hi e)} (EntryRange0 e)))"  
 
-definition EntryExtendedRange1 :: "TLBENTRY \<Rightarrow> addr set" 
+definition EntryExtendedRange1 :: "TLBENTRY \<Rightarrow> genaddr set" 
   where "EntryExtendedRange1 e =   (if (EntryIsGlobal e) then
                                       (mk_extended_range ASIDValidSet (EntryRange1 e))
                                    else
@@ -960,7 +963,7 @@ subsection "Extended Range Union"
 lemma entry_extended_range_union:  
   "EntryExtendedRange e = (EntryExtendedRange0 e) \<union> (EntryExtendedRange1 e)"   
   by(simp add:EntryExtendedRange_def EntryExtendedRange0_def EntryExtendedRange1_def 
-              mk_extended_range_addr_union[symmetric] entry_range_union)
+              mk_extended_range_genaddr_union[symmetric] entry_range_union)
 
             
 (* ------------------------------------------------------------------------- *) 
@@ -982,7 +985,7 @@ proof -
     by(simp add :TLBENTRYWellFormedEntryRangeValid)
   with space1 have X0:  "mk_extended_range X (EntryRange e1) \<inter> mk_extended_range X (EntryRange e2) = 
                         mk_extended_range X ((EntryRange e1) \<inter> (EntryRange e2))"
-    by(simp add:mk_extended_range_addr_inter[symmetric] space1 space2 nz)
+    by(simp add:mk_extended_range_genaddr_inter[symmetric] space1 space2 nz)
   
   hence X1: "mk_extended_range X (EntryRange e1 \<inter> EntryRange e2)  = mk_extended_range X {}"
      by(simp add:empty)
@@ -1020,7 +1023,7 @@ proof cases
                    \<inter> mk_extended_range {asid (hi e2)} (EntryRange e2)"
         by(simp add:EntryExtendedRange_def)
       with space1 space2 empty nz show ?thesis 
-         by(auto simp add:mk_extended_range_empty_addr_inter2)      
+         by(auto simp add:mk_extended_range_empty_genaddr_inter2)      
      qed
   qed              
 next
@@ -1040,7 +1043,7 @@ next
                   \<inter> mk_extended_range ASIDValidSet  (EntryRange e2)"
         by(simp add:EntryExtendedRange_def)
       with space1 space2 empty nz show ?thesis 
-         by(auto simp add:mk_extended_range_empty_addr_inter2)      
+         by(auto simp add:mk_extended_range_empty_genaddr_inter2)      
      qed
   next
     assume ne2g: "\<not>(EntryIsGlobal e2)"
@@ -1056,7 +1059,7 @@ next
                    \<inter> mk_extended_range {asid (hi e2)}  (EntryRange e2)"
         by(simp add:EntryExtendedRange_def)
       with space1 space2 empty nz show ?thesis 
-         by(auto simp add:mk_extended_range_empty_addr_inter2)      
+         by(auto simp add:mk_extended_range_empty_genaddr_inter2)      
      qed
   qed              
 qed      
@@ -1067,12 +1070,12 @@ subsection "TLB Entry Physical Addresses"
 (* ------------------------------------------------------------------------- *)  
     
 text "The TLB entry pair maps to two physical regions, we need to multiply the PFN
-      with the actual frame size to get the address"  
+      with the actual frame size to get the genaddress"  
   
-definition EntryPA0 :: "TLBENTRY \<Rightarrow> addr" 
+definition EntryPA0 :: "TLBENTRY \<Rightarrow> genaddr" 
   where "EntryPA0 e = (pfn (lo0 e)) * (EntrySize e)"
  
-definition EntryPA1 :: "TLBENTRY \<Rightarrow> addr" 
+definition EntryPA1 :: "TLBENTRY \<Rightarrow> genaddr" 
   where "EntryPA1 e = (pfn (lo1 e)) * (EntrySize e)"
 
     
@@ -1138,7 +1141,7 @@ lemma TLBEntryResetASID_match :
 subsection "VPN Match"  
 (* ------------------------------------------------------------------------- *)   
 
-text "The VPN matches if their respective virtual addresses fall within the
+text "The VPN matches if their respective virtual genaddresses fall within the
       ranges. "   
   
 definition EntryMax4KVPN :: "TLBENTRY \<Rightarrow> VPN"
@@ -1382,8 +1385,8 @@ proof cases
             \<inter> mk_extended_range ASIDValidSet (EntryRange e2) \<noteq> {})"
         by(simp add:EntryMatchER_def EntryExtendedRange_def e1g e2g)
       hence  X2: "... = (mk_extended_range ASIDValidSet (EntryRange e1 \<inter> EntryRange e2) \<noteq> {})"
-        by(simp add:mk_extended_range_addr_inter nz space1 space2)
-      with X0 X1 show ?thesis by(simp add:X0 X1 X2 nemtpy mk_extended_range_empty_addr_inter)
+        by(simp add:mk_extended_range_genaddr_inter nz space1 space2)
+      with X0 X1 show ?thesis by(simp add:X0 X1 X2 nemtpy mk_extended_range_empty_genaddr_inter)
     qed
   next
     assume ne2g: "\<not>(EntryIsGlobal e2)"
@@ -1404,7 +1407,7 @@ proof cases
         by(simp add:mk_extended_range_inter space1 space2 nz) 
       from asidset have X3: "... = (mk_extended_range {asid (hi e2)} (EntryRange e1 \<inter> EntryRange e2) \<noteq> {})"
         by(auto)
-      with X0 X1 show ?thesis by(simp add:X0 X1 X2 X3 mk_extended_range_empty_addr_inter)
+      with X0 X1 show ?thesis by(simp add:X0 X1 X2 X3 mk_extended_range_empty_genaddr_inter)
     qed
   qed              
 next
@@ -1429,7 +1432,7 @@ next
         by(simp add:mk_extended_range_inter space1 space2 nz) 
       from asidset have X3: "... = (mk_extended_range {asid (hi e1)} (EntryRange e1 \<inter> EntryRange e2) \<noteq> {})"
         by(auto)
-      with X0 X1 show ?thesis by(simp add:X0 X1 X2 X3 mk_extended_range_empty_addr_inter)
+      with X0 X1 show ?thesis by(simp add:X0 X1 X2 X3 mk_extended_range_empty_genaddr_inter)
     qed      
   next
     assume ne2g: "\<not>(EntryIsGlobal e2)"
@@ -1457,7 +1460,7 @@ next
             have X0: "EntryMatch e1 e2 = (EntryRange e1 \<inter> EntryRange e2 \<noteq> {})"
               by(simp add:EntryMatch_def asidmatch EntryVPNMatch_def)
             with X1 X2 X3 X0 show ?thesis 
-              by(simp add:X1 X2 X3 X0 mk_extended_range_empty_addr_inter)
+              by(simp add:X1 X2 X3 X0 mk_extended_range_empty_genaddr_inter)
           qed
         next
         assume eq:  "(asid (hi e1)) \<noteq>  (asid (hi e2))"
@@ -1470,7 +1473,7 @@ next
             have X0: "EntryMatch e1 e2 =  False"
               by(simp add:EntryMatch_def nasidmatch)
             with X1 X2 X3 X0 show ?thesis 
-              by(auto simp:mk_extended_range_def X1 X2 X3 X0 mk_extended_range_empty_addr_inter)
+              by(auto simp:mk_extended_range_def X1 X2 X3 X0 mk_extended_range_empty_genaddr_inter)
           qed
         qed
     qed  
@@ -1671,12 +1674,12 @@ definition ValidIndexRange :: "MIPSTLB \<Rightarrow> nat set"
   where "ValidIndexRange tlb =  {x.  0 \<le> x \<and> x < (capacity tlb)}"
   
 definition RandomIndexRange :: "MIPSTLB \<Rightarrow> nat set"  
-  where "RandomIndexRange tlb =  {x.  (wired tlb) \<le> x \<and> x < (capacity tlb)}"
+  where "RandomIndexRange tlb =  {x.  (wired tlb) \<le> x \<and> x < (capacity tlb)} \<union> {(capacity tlb) - 1}"
 
 
 lemma RandomIndex_in_capacity:
-"\<And>i. i \<in> RandomIndexRange tlb \<Longrightarrow>  i < (capacity tlb)"
-  by(simp add:RandomIndexRange_def)
+"\<And>i. (capacity tlb) > 0 \<Longrightarrow> i \<in> RandomIndexRange tlb \<Longrightarrow>  i < (capacity tlb)"
+  by(auto simp add:RandomIndexRange_def)
     
 
     
@@ -1751,20 +1754,20 @@ subsection "TLB Valid"
   
 text "The TLB is in a valid state if all entries are valid with respect to
       their values and for any two entries, they are either the same
-      or they won't match to the same address range. For any state 
+      or they won't match to the same genaddress range. For any state 
       modification of the TLB, this must hold. "
   
 definition TLBValid_orig :: "MIPSTLB \<Rightarrow> bool"
-  where "TLBValid_orig tlb = (((wired tlb) < (capacity tlb)  \<and> (wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+  where "TLBValid_orig tlb = (((wired tlb) \<le> (capacity tlb)  \<and> (wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                         (TLBEntryWellFormed tlb i) \<and> (
                         (i = j) \<or> \<not> EntryMatch ((entries tlb) i) ((entries tlb j)))))"    
 
 definition TLBValid:: "MIPSTLB \<Rightarrow> bool"
-  where "TLBValid tlb = (((wired tlb) < (capacity tlb)  \<and> (wired tlb) < TLBMaximumWired  ) \<and> (\<forall>i < (capacity tlb).  
+  where "TLBValid tlb = (((wired tlb) \<le> (capacity tlb)  \<and> (wired tlb) < TLBMaximumWired  ) \<and> (\<forall>i < (capacity tlb).  
                         (TLBEntryWellFormed tlb i) \<and> ((TLBEntryConflictSet (entries tlb i) tlb) \<subseteq> {i})))"    
 
 definition TLBValidER :: "MIPSTLB \<Rightarrow> bool"
-  where "TLBValidER tlb = (((wired tlb) < (capacity tlb) \<and> (wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb).  
+  where "TLBValidER tlb = (((wired tlb) \<le> (capacity tlb) \<and> (wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb).  
                         (TLBEntryWellFormed tlb i) \<and> ((TLBEntryConflictSetER (entries tlb i) tlb) \<subseteq> {i})))"      
     
     
@@ -1801,12 +1804,12 @@ proof -
   fix i j
   assume valid : "TLBValidER tlb"
   
-  from valid have wired: "wired tlb < TLBMaximumWired \<and>  wired tlb < capacity tlb" 
+  from valid have wired: "wired tlb < TLBMaximumWired \<and>  wired tlb \<le> capacity tlb" 
      by(simp add:TLBValidER_def valid)
   from valid have wellformed : " \<forall>j<(capacity tlb). TLBEntryWellFormed tlb j"
      by(simp add:TLBValidER_def valid)    
     
-   have X0: "TLBValidER tlb = (wired tlb < TLBMaximumWired \<and> wired tlb < capacity tlb \<and> (\<forall>i<(capacity tlb). 
+   have X0: "TLBValidER tlb = (wired tlb < TLBMaximumWired \<and> wired tlb \<le> capacity tlb \<and> (\<forall>i<(capacity tlb). 
                   TLBEntryWellFormed tlb i \<and> TLBEntryConflictSetER (entries tlb i) tlb \<subseteq> {i}))"
     by(auto simp add:TLBValidER_def) 
 
@@ -1832,12 +1835,12 @@ proof
   proof - 
     assume valid: "TLBValid tlb"
       
-    have X0: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired \<and>  wired tlb < capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+    have X0: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired \<and>  wired tlb \<le> capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                            (TLBEntryWellFormed tlb i) \<and> (
                            (i = j) \<or> \<not> EntryMatchER ((entries tlb) i) ((entries tlb j)))))"
       by(auto simp add:TLBValidER_def TLBEntryConflictSetER_def)
     
-    also  have X1: "TLBValid tlb =  (((wired tlb) < TLBMaximumWired  \<and>  wired tlb < capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+    also  have X1: "TLBValid tlb =  (((wired tlb) < TLBMaximumWired  \<and>  wired tlb \<le> capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                                 (TLBEntryWellFormed tlb i) \<and> (
                                 (i = j) \<or> \<not> EntryMatch ((entries tlb) i) ((entries tlb j)))))"
       by(auto simp add:TLBValid_def TLBEntryConflictSet_def)
@@ -1846,7 +1849,7 @@ proof
     with valid have wf: "\<forall>i < (capacity tlb). TLBENTRYWellFormed (entries tlb i)"
       by(auto simp add:TLBValidImpliesWellFormed)
     
-    with valid wf nz have X2: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired  \<and>  wired tlb < capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+    with valid wf nz have X2: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired  \<and>  wired tlb \<le> capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                            (TLBEntryWellFormed tlb i) \<and> (
                            (i = j) \<or> \<not> EntryMatch ((entries tlb) i) ((entries tlb j)))))"
       by(simp add:X0 EntryMatchEqualsEntryMatchER)
@@ -1860,12 +1863,12 @@ proof
   proof - 
     fix i
     assume valid: "TLBValidER tlb"
-    have X0: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired  \<and>  wired tlb < capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+    have X0: "TLBValidER tlb = (((wired tlb) < TLBMaximumWired  \<and>  wired tlb \<le> capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                            (TLBEntryWellFormed tlb i) \<and> (
                            (i = j) \<or> \<not> EntryMatchER ((entries tlb) i) ((entries tlb j)))))"
       by(auto simp add:TLBValidER_def TLBEntryConflictSetER_def)
     
-    also  have X1: "TLBValid tlb =  (((wired tlb) < TLBMaximumWired  \<and>  wired tlb < capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+    also  have X1: "TLBValid tlb =  (((wired tlb) < TLBMaximumWired  \<and>  wired tlb \<le> capacity tlb ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                                 (TLBEntryWellFormed tlb i) \<and> (
                                 (i = j) \<or> \<not> EntryMatch ((entries tlb) i) ((entries tlb j)))))"
       by(auto simp add:TLBValid_def TLBEntryConflictSet_def)
@@ -1932,7 +1935,7 @@ next
   then show ?thesis 
   proof -
     from valid have X0: 
-      "(((wired tlb) < (capacity tlb)  \<and> (wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
+      "(((wired tlb) \<le> (capacity tlb)  \<and> (wired tlb) < TLBMaximumWired ) \<and> (\<forall>i < (capacity tlb). \<forall>j < (capacity tlb). 
                         (TLBEntryWellFormed tlb i) \<and> (
                         (i = j) \<or> \<not> EntryMatch ((entries tlb) i) ((entries tlb j)))))"
       by(auto simp add:TLBValid_def TLBValid_orig_def TLBEntryConflictSet_def)
@@ -2080,7 +2083,7 @@ text "The TLBReset function initializes a new TLB at reset state.
       are undefined."
     
 definition TLB_in_reset :: "MIPSTLB \<Rightarrow> bool" where
-  "TLB_in_reset tlb \<longleftrightarrow> wired tlb = 0"
+  "TLB_in_reset tlb \<longleftrightarrow> wired tlb = 0 \<and> (random tlb = (capacity tlb - 1))"
 
 text "The invalid TLB satisfies the reset"
   
@@ -2098,6 +2101,7 @@ definition MIPSTLBInit :: "nat \<Rightarrow> nat \<Rightarrow> MIPSTLB \<Rightar
   where "MIPSTLBInit c w tlb = \<lparr> 
               capacity = c ,
               wired = w,
+              random = c - 1,
               entries = (\<lambda>n. if n < c then TLBEntryReset (n) else entries tlb n) \<rparr>"
 
 definition MIPSR4600TLBinit :: "nat \<Rightarrow> MIPSTLB \<Rightarrow> MIPSTLB"
@@ -2184,7 +2188,7 @@ lemma InvalidTLBNotValid :
   "(TLBValid invalid_tlb) = False"
 proof -
 
-  have wired: "wired invalid_tlb < capacity invalid_tlb"
+  have wired: "wired invalid_tlb \<le> capacity invalid_tlb"
     by(simp add:invalid_tlb_def MIPSR4600Capacity_def)
       
   have v: "TLBValid invalid_tlb = 
@@ -2309,6 +2313,7 @@ definition tlbwi :: "nat \<Rightarrow> TLBENTRY \<Rightarrow> MIPSTLB \<Rightarr
   where "tlbwi idx e tlb = (if idx < (capacity tlb) then 
                                {\<lparr> capacity = (capacity tlb),
                                   wired = (wired tlb),  
+                                  random = random tlb,
                                   entries = (entries tlb)(idx :=  e) \<rparr>}
                             else 
                                UNIV)"
@@ -2317,6 +2322,7 @@ definition tlbwi :: "nat \<Rightarrow> TLBENTRY \<Rightarrow> MIPSTLB \<Rightarr
 lemma "\<And>tlb e.  (capacity tlb) > 0 \<Longrightarrow> tlbwi ((vpn2 (hi (e))) mod (capacity tlb)) e tlb =
            {\<lparr> capacity = (capacity tlb), 
              wired = (wired tlb), 
+             random = random tlb,
              entries = (entries tlb)(((vpn2 (hi (e))) mod (capacity tlb)) :=  e) \<rparr>}"
   by(simp add:tlbwi_def)
   
@@ -2341,23 +2347,28 @@ proof
   have X0:  "\<And>idx e. \<forall>t \<in> tlbwi idx e tlb. TLBValid t = 
                           TLBValid \<lparr>capacity = capacity tlb,
                                     wired = wired tlb, 
-                                    entries = (entries tlb)(idx := e)\<rparr>"
+                                    random = random tlb,
+                                    entries = (entries tlb)(idx := e) \<rparr>"
      by(simp add:tlbwi_def ir)
       
-   have X1:  "TLBValid tlb \<Longrightarrow>(wired tlb) < (capacity tlb) \<and> (wired tlb) < TLBMaximumWired "
+   have X1:  "TLBValid tlb \<Longrightarrow>(wired tlb) \<le> (capacity tlb) \<and> (wired tlb) < TLBMaximumWired "
      by(simp add: TLBValid_def)
        
    have X2:  "(wired  \<lparr>capacity = capacity tlb, 
                      wired = wired tlb, 
-                     entries = (entries tlb)(idx := e)\<rparr>) < (capacity  \<lparr>capacity = capacity tlb, 
+                     random = random tlb,
+                     entries = (entries tlb)(idx := e)\<rparr>) \<le> (capacity  \<lparr>capacity = capacity tlb, 
                      wired = wired tlb, 
+                     random = random tlb,
                      entries = (entries tlb)(idx := e)\<rparr>) \<and> (wired \<lparr>capacity = capacity tlb, 
                      wired = wired tlb, 
+                     random = random tlb,
                      entries = (entries tlb)(idx := e)\<rparr> < TLBMaximumWired)"
      by(simp add:  X1 tlbvalid )
        
    have X3: "\<And>i. (TLBEntryWellFormed  \<lparr> capacity = capacity tlb, 
                                         wired = wired tlb, 
+                                        random = random tlb,
                                         entries = (entries tlb)(idx := e)\<rparr> i) =
             (TLBEntryWellFormed tlb i) \<and> TLBENTRYWellFormed e"
      by(simp add:TLBEntryWellFormed_def wf)
@@ -2367,31 +2378,35 @@ proof
   
    have X5: "TLBValid \<lparr> capacity = capacity tlb, 
                         wired = wired tlb, 
+                        random = random tlb,
                         entries = (entries tlb)(idx := e)\<rparr> = 
          (\<forall>i<(capacity tlb).
          TLBEntryWellFormed \<lparr>capacity = capacity tlb, 
                             wired = wired tlb, 
+                            random = random tlb,
                             entries = (entries tlb)(idx := e)\<rparr> i \<and>
          TLBEntryConflictSet (
                   entries \<lparr> capacity = capacity tlb, 
                            wired = wired tlb, 
+                           random = random tlb,
                            entries = (entries tlb)(idx := e)\<rparr> i)
                   \<lparr> capacity = capacity tlb, 
                     wired = wired tlb, 
+                    random = random tlb,
                     entries = (entries tlb)(idx := e)\<rparr> \<subseteq> {i})"
      by(simp only:TLBValid_def tlbvalid X2 X1, auto)
    
    have X6 : "... = (\<forall>i<(capacity tlb).
          (TLBEntryWellFormed tlb i) \<and> TLBENTRYWellFormed e \<and>
          TLBEntryConflictSet (entries
-           \<lparr> capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(idx := e)\<rparr> i)
-           \<lparr> capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(idx := e)\<rparr> \<subseteq> {i})"
+           \<lparr> capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(idx := e)\<rparr> i)
+           \<lparr> capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(idx := e)\<rparr> \<subseteq> {i})"
      by(simp add:wf X3 )
    
    have X7:  "... =  (\<forall>i<(capacity tlb).
          TLBEntryConflictSet (entries 
-          \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(idx := e)\<rparr> i) 
-          \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(idx := e)\<rparr> \<subseteq> {i})"
+          \<lparr>capacity = capacity tlb, wired = wired tlb,random = random tlb, entries = (entries tlb)(idx := e)\<rparr> i) 
+          \<lparr>capacity = capacity tlb, wired = wired tlb,random = random tlb, entries = (entries tlb)(idx := e)\<rparr> \<subseteq> {i})"
      by(simp add:X4)
        
    with wf wr ir X0 X1 X2 X3 X4 X5 X6 X7 show " \<And>idx e t. t \<in> tlbwi idx e tlb \<Longrightarrow> TLBValid t"
@@ -2412,6 +2427,7 @@ text "The MIPS TLB supports a random replacement."
 definition tlbwr :: "TLBENTRY \<Rightarrow> MIPSTLB \<Rightarrow> MIPSTLB set" where
    "tlbwr e tlb = { t2  |t2  i. t2 \<in> {\<lparr> capacity = (capacity tlb),
                                   wired = (wired tlb),  
+                                  random = random tlb,
                                   entries = (entries tlb)(i :=  e) \<rparr>} \<and> i \<in> (RandomIndexRange tlb)}"   
 
 definition tlbwr2 :: "TLBENTRY \<Rightarrow> MIPSTLB \<Rightarrow> MIPSTLB set" where
@@ -2419,7 +2435,7 @@ definition tlbwr2 :: "TLBENTRY \<Rightarrow> MIPSTLB \<Rightarrow> MIPSTLB set" 
    
    
 lemma MIPSTLB_randwr:
-   "tlbwr e tlb = tlbwr2 e tlb"
+   "capacity tlb > 0 \<Longrightarrow> tlbwr e tlb = tlbwr2 e tlb"
   by(simp add:tlbwr_def tlbwr2_def RandomIndexRange_def tlbwi_def, auto)
          
    
@@ -2436,7 +2452,7 @@ lemma TLBRandomUpdateValid :
 proof -
   
   from nc have NoConflictSet :
-    "\<forall>i < capacity tlb. TLBEntryConflictSet e \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {i}"
+    "\<forall>i < capacity tlb. TLBEntryConflictSet e \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {i}"
     by(simp add:TLBEntryNoConflict_def TLBEntryConflictSet_def, auto)
   
   from nc have nomatch: "\<forall>j<capacity tlb. \<not>EntryMatch e (entries tlb j)"
@@ -2445,43 +2461,44 @@ proof -
   have X0: "(\<forall>t \<in> (tlbwr e tlb). TLBValid t) = 
              (\<forall>i \<in> RandomIndexRange tlb. \<forall>t \<in>  {\<lparr> capacity = (capacity tlb),
                                   wired = (wired tlb),  
+                                  random = random tlb,
                                   entries = (entries tlb)(i :=  e) \<rparr>}. TLBValid t )"
     by(simp add:tlbwr_def, auto)
     
   from tlbvalid have X1 : " ... =  (\<forall>i\<in>RandomIndexRange tlb.
-        \<forall>t\<in>{\<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr>}.
+        \<forall>t\<in>{\<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr>}.
             (\<forall>i<capacity t. TLBEntryWellFormed t i \<and> TLBEntryConflictSet (entries t i) t \<subseteq> {i}))"
     by(simp only:TLBValid_def, auto)
 
   
   have X2 : " ... =  (\<forall>i\<in>RandomIndexRange tlb. \<forall>j<capacity tlb. 
-        \<forall>t\<in>{\<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr>}.
+        \<forall>t\<in>{\<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr>}.
             (TLBEntryWellFormed t j \<and> TLBEntryConflictSet (entries t j) t \<subseteq> {j}))"
     by(auto)      
         
   have X3: " ... =  (\<forall>i\<in>RandomIndexRange tlb. \<forall>j<capacity tlb. 
-            (TLBEntryWellFormed \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> j 
-          \<and> TLBEntryConflictSet (entries \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> j) \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j}))"
+            (TLBEntryWellFormed \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> j 
+          \<and> TLBEntryConflictSet (entries \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> j) \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j}))"
     by(auto)
       
       
   have X4: " ... = (\<forall>i\<in>RandomIndexRange tlb. \<forall>j<capacity tlb. 
-          (i = j \<longrightarrow>  (TLBEntryWellFormed \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> j 
-          \<and> TLBEntryConflictSet (entries \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> i) \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {i}) ) \<and>
-          (i \<noteq> j \<longrightarrow>   (TLBEntryWellFormed \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> j 
-          \<and> TLBEntryConflictSet (entries \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)\<rparr> j) \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j})))"
+          (i = j \<longrightarrow>  (TLBEntryWellFormed \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> j 
+          \<and> TLBEntryConflictSet (entries \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> i) \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {i}) ) \<and>
+          (i \<noteq> j \<longrightarrow>   (TLBEntryWellFormed \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> j 
+          \<and> TLBEntryConflictSet (entries \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)\<rparr> j) \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j})))"
     by(auto)    
             
    from wf tlbvalid have X6: " ... =  (\<forall>i\<in>RandomIndexRange tlb.
         \<forall>j<capacity tlb.
-           (i = j \<longrightarrow> TLBEntryConflictSet e \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {i}) \<and>
-           (i \<noteq> j \<longrightarrow> TLBEntryConflictSet (entries tlb j) \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j}))"
+           (i = j \<longrightarrow> TLBEntryConflictSet e \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {i}) \<and>
+           (i \<noteq> j \<longrightarrow> TLBEntryConflictSet (entries tlb j) \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j}))"
     by(simp add:TLBEntryWellFormed_def TLBValid_def)
 
 
   from NoConflictSet have X7 :  " ... =  (\<forall>i\<in>RandomIndexRange tlb.
         \<forall>j<capacity tlb.
-           (i \<noteq> j \<longrightarrow> TLBEntryConflictSet (entries tlb j) \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j}))"
+           (i \<noteq> j \<longrightarrow> TLBEntryConflictSet (entries tlb j) \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j}))"
     by(auto)
       
   have X8: " ... =  (\<forall>i\<in>RandomIndexRange tlb.
@@ -2516,16 +2533,25 @@ text "Create the decoding net node. Each TLB entry has either zero, one or two m
 subsection "Helper Functions"
 (* ------------------------------------------------------------------------- *) 
   
-text{* Creates a mapspec list from the odd and even entries *}
+text{* Creates a mapspec list from the odd and even entries. We currently deal with two
+       properties. If the write permissions dirty are set, then read and write requests
+       can be handled. If it's not set then writes are not allowed *}
+
+definition EntryPropertyMatch :: "TLBENTRYLO \<Rightarrow> addr \<Rightarrow> bool"
+  where "EntryPropertyMatch e a = (if (d e) then 
+                                     True  
+                                   else 
+                                     PWRITE \<notin> (snd a))"
+
 
     
-definition EntryToMap :: "nodeid \<Rightarrow> TLBENTRY \<Rightarrow> nat \<Rightarrow>(nat \<times> nat) set"
+definition EntryToMap :: "nodeid \<Rightarrow> TLBENTRY \<Rightarrow> addr \<Rightarrow> name set"
   where
     "EntryToMap nd e va =
-      (if EntryIsValid0 e \<and> va \<in> EntryExtendedRange0 e then 
-          {(nd, EntryPA0 e + ((va mod VASize) - EntryMinVA0 e))} else {}) \<union>
-      (if EntryIsValid1 e \<and> va \<in> EntryExtendedRange1 e then
-           {(nd, EntryPA1 e + ((va mod VASize) - EntryMinVA1 e))} else {})"      
+      (if EntryIsValid0 e \<and> (EntryPropertyMatch (lo0 e) va) \<and> (fst va) \<in> EntryExtendedRange0 e then 
+          {(nd, (EntryPA0 e + (((fst va) mod VASize) - EntryMinVA0 e)), (snd va))} else {}) \<union>
+      (if EntryIsValid1 e \<and> (EntryPropertyMatch (lo1 e) va) \<and> (fst va) \<in> EntryExtendedRange1 e then
+           {(nd, (EntryPA1 e + (((fst va) mod VASize) - EntryMinVA1 e)), (snd va))} else {})"      
     
 
 (* ------------------------------------------------------------------------- *)  
@@ -2614,7 +2640,7 @@ lemma TLB_to_node_lift :
     shows "ConvertToNode nd ` (tlbwi i e tlb) = {replace_entry nd ((entries tlb) i) e (ConvertToNode nd tlb)}"
 proof -
   from inrange
-  have "tlbwi i e tlb = {\<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr>}"
+  have "tlbwi i e tlb = {\<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr>}"
     by(simp add:tlbwi_def)
   hence "ConvertToNode nd ` (tlbwi i e tlb) =
          {\<lparr>accept = {}, translate = \<lambda>a. \<Union>x<(capacity tlb). EntryToMap nd (if x = i then e else entries tlb x) a\<rparr>}"
@@ -2685,9 +2711,9 @@ qed
 section "TLB Exceptions"
 (* ========================================================================= *)   
 
-text "An attempt to translate a mapped address can result into one of four
+text "An attempt to translate a mapped genaddress can result into one of four
       states: no entry present (REFILL), entry is invalid (INVALID) those
-      won't translate the address. The address will be translated if
+      won't translate the genaddress. The genaddress will be translated if
       the entry is in the modified state or there is no exception."  
   
 datatype MIPSTLBEXN = EXNREFILL | EXNINVALID | EXNMOD | EXNOK
@@ -2798,7 +2824,7 @@ qed
 section "Translate Function"
 (* ========================================================================= *) 
   
-definition TLBENTRY_translate_va :: "TLBENTRY \<Rightarrow> nat \<Rightarrow> nat set"
+definition TLBENTRY_translate_va :: "TLBENTRY \<Rightarrow> genaddr \<Rightarrow> nat set"
   where
     "TLBENTRY_translate_va e va =
       (if EntryIsValid0 e \<and> va \<in> EntryExtendedRange0 e then 
@@ -2846,13 +2872,6 @@ text "The translate function of an initialized TLB is always emtpy"
 lemma "MIPSTLB_translate (MIPSTLBInit c w tlb) as vpn = {}"
   by(simp add:MIPSTLB_translate_def MIPSTLBInit_def TLBENTRY_translate_empty)
   
-
-
-    
-lemma "\<And>vpn as. MIPSTLB_try_translate t as vpn = EXNREFILL \<Longrightarrow>
-        MIPSTLB_translate t as vpn = {}"
-  oops
-    
     
 
 lemma MIPSTLB_fault_no_translate:
@@ -2867,14 +2886,6 @@ proof -
 qed
       
     
-    
-(*
-MIPSTLB_try_translate_exist_match :
-    assumes translates:  "MIPSTLB_try_translate tlb as vpn \<noteq> EXNREFILL"
-    shows "(\<exists>i<capacity tlb. EntryMatchVPNASID vpn as (entries tlb i))"
-
-
- *)    
     
 (*<*)
 end

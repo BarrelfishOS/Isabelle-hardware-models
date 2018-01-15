@@ -43,6 +43,7 @@ text "Next we show that for all "
 lemma 
     assumes inrange: "vpn < MIPSPT_EntriesMax"
         and inrange2: "as < ASIDMax"
+        and cap: "capacity (tlb mpt) > 0"
         and valid: "MipsTLBPT_valid mpt"
   shows "MipsTLBPT_translate mpt as vpn = 
          MIPSTLB_translate (MipsTLBLarge_create (pte mpt)) as vpn"
@@ -55,7 +56,7 @@ proof -
      (if (v ((entry (pte mpt)) vpn as)) then {(pfn ((entry (pte mpt)) vpn as))} else {})"
     by(simp add:MipsTLBLarge_translate_is)
     
-  from valid inrange inrange2 have X1:
+  from valid inrange inrange2 cap have X1:
     "MipsTLBPT_translate mpt as vpn =  (if (v ((entry (pte mpt)) vpn as)) then {(pfn ((entry  (pte mpt)) vpn as))} else {})"
     by(simp add:MipsTLBPT_translate_is)
   

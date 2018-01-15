@@ -34,19 +34,19 @@ begin
 subsubsection {* Address spaces *}
 
 text {* DRAM *}
-definition "dram_sys0 = (0x0000000000000000,0x000000000009BFFF)" 
-definition "dram_sys1 = (0x0000000000100000,0x00000000BAD27FFF)"
-definition "dram_sys2 = (0x00000000BAF90000,0x00000000BAFC4FFF)"
-definition "dram_sys3 = (0x00000000BAFDA000,0x00000000BB3D3FFF)"
-definition "dram_sys4 = (0x00000000BDFAC000,0x00000000BDFFFFFF)"
-definition "dram_sys5 = (0x0000000100000000,0x000000203FFFFFFF)"
-definition "dram_sys6 = (0x0000002040000000,0x000000403FFFFFFF)"
+definition "dram_sys0 = blockn 0x0000000000000000 0x000000000009BFFF" 
+definition "dram_sys1 = blockn 0x0000000000100000 0x00000000BAD27FFF"
+definition "dram_sys2 = blockn 0x00000000BAF90000 0x00000000BAFC4FFF"
+definition "dram_sys3 = blockn 0x00000000BAFDA000 0x00000000BB3D3FFF"
+definition "dram_sys4 = blockn 0x00000000BDFAC000 0x00000000BDFFFFFF"
+definition "dram_sys5 = blockn 0x0000000100000000 0x000000203FFFFFFF"
+definition "dram_sys6 = blockn 0x0000002040000000 0x000000403FFFFFFF"
 
 text {* PCI Express Ranges *}
-definition "pci_lo_0 = (0xD0000000,0xD0EFFFFF)"
-definition "pci_lo_1 = (0xEC000000,0xEC1FFFFF)" 
-definition "pci_hi_0 = (0x0000380000000000,0x00003802009FFFFF)"
-definition "pci_hi_1 = (0x0000380400000000,0x00003806007FFFFF)"
+definition "pci_lo_0 = blockn 0xD0000000 0xD0EFFFFF"
+definition "pci_lo_1 = blockn 0xEC000000 0xEC1FFFFF" 
+definition "pci_hi_0 = blockn 0x0000380000000000 0x00003802009FFFFF"
+definition "pci_hi_1 = blockn 0x0000380400000000 0x00003806007FFFFF"
 
 text {* The Node 0 Interconnect *}              
 definition "node_0_interconnect = empty_spec \<lparr>
@@ -71,37 +71,37 @@ definition "node_1_interconnect = empty_spec \<lparr>
 \<rparr>" 
   
 text {* DRAM controller 0: 4 channels with 32G each. *}
-definition "dram0_0 = (0x00000000000, 0x007FFFFFFFF)"
-definition "dram0_1 = (0x00800000000, 0x00FFFFFFFFF)"
-definition "dram0_2 = (0x01000000000, 0x017FFFFFFFF)"  
-definition "dram0_3 = (0x01800000000, 0x01FFFFFFFFF)"
+definition "dram0_0 = blockn 0x00000000000 0x007FFFFFFFF"
+definition "dram0_1 = blockn 0x00800000000 0x00FFFFFFFFF"
+definition "dram0_2 = blockn 0x01000000000 0x017FFFFFFFF"  
+definition "dram0_3 = blockn 0x01800000000 0x01FFFFFFFFF"
 definition "node_2_dram = empty_spec \<lparr>
   acc_blocks := [dram0_0, dram0_1, dram0_2, dram0_3],
   map_blocks := []
 \<rparr>"
   
 text {* DRAM controller 1: 4 channels with 32G each *}
-definition "dram1_0 = (0x02000000000, 0x027ffffffff)"
-definition "dram1_1 = (0x02800000000, 0x02FFFFFFFFF)"
-definition "dram1_2 = (0x03000000000, 0x037FFFFFFFF)"  
-definition "dram1_3 = (0x03800000000, 0x03FFFFFFFFF)"
+definition "dram1_0 = blockn 0x02000000000 0x027ffffffff"
+definition "dram1_1 = blockn 0x02800000000 0x02FFFFFFFFF"
+definition "dram1_2 = blockn 0x03000000000 0x037FFFFFFFF"  
+definition "dram1_3 = blockn 0x03800000000 0x03FFFFFFFFF"
 definition "node_3_dram = empty_spec \<lparr>
   acc_blocks := [dram1_0, dram1_1, dram1_2, dram1_3],
   map_blocks := []
 \<rparr>"
 
 text {* PCI Express Devices *}
-definition "phi0_gddr = (0x380000000000, 0x3801FFFFFFFF)"
-definition "phi0_mmio = (0xD0C00000, 0xd0C1FFFF)"
-definition "phi1_gddr = (0x380400000000, 0x3805FFFFFFFF)"
-definition "phi1_mmio = (0xDC200000, 0xEC21FFFF)"  
-definition "dma0 = (0x3803FFF90000, 0x3803FFF23FFF)"
-definition "dma1 = (0x3807FFF60000, 0x3807FFF03FFF)"
-definition "ahci = (0xD0F00000, 0xD0F007FF)"
-definition "ehci = (0xD0F10000, 0xD0F103FF)"
-definition "ioapic0 = (0xD0F60000, 0xD0F60FFF)"
-definition "ioapic1 = (0xEC300000, 0xEC300FFF)"
-definition "e1000 = (0xD0960000, 0xD097FFFFF)"
+definition "phi0_gddr = blockn 0x380000000000 0x3801FFFFFFFF"
+definition "phi0_mmio = blockn 0x0000D0C00000 0x0000d0C1FFFF"
+definition "phi1_gddr = blockn 0x380400000000 0x3805FFFFFFFF"
+definition "phi1_mmio = blockn 0x0000DC200000 0x0000EC21FFFF"  
+definition "dma0      = blockn 0x3803FFF90000 0x3803FFF23FFF"
+definition "dma1      = blockn 0x3807FFF60000 0x3807FFF03FFF"
+definition "ahci      = blockn 0x0000D0F00000 0x0000D0F007FF"
+definition "ehci      = blockn 0x0000D0F10000 0x0000D0F103FF"
+definition "ioapic0   = blockn 0x0000D0F60000 0x0000D0F60FFF"
+definition "ioapic1   = blockn 0x0000EC300000 0x0000EC300FFF"
+definition "e1000     = blockn 0x0000D0960000 0x000D097FFFFF"
 
 text {* PCI Root Complex 0 *} 
 definition "node_4_pci = empty_spec \<lparr>
@@ -170,10 +170,10 @@ definition "node_12_ahci = empty_spec \<lparr>
 
 text {* Xeon Phi 0 *}
 
-definition "phi_gddr = (0, 0x180000000)"
-definition "phi_sbox = (0x08007D0000,0x8007E0000)"
-definition "phi_sysmem = (0x8000000000, 0xFFFFFFFFFF)"
-definition "phi_lut_e00 = (0x0000000000, 0x03FFFFFFFF)"  
+definition "phi_gddr    = blockn 0x0000000000 0x0180000000"
+definition "phi_sbox    = blockn 0x08007D0000 0x08007E0000"
+definition "phi_sysmem  = blockn 0x8000000000 0xFFFFFFFFFF"
+definition "phi_lut_e00 = blockn 0x0000000000 0x03FFFFFFFF"  
 
 definition "node_13_phi = empty_spec \<lparr>
   acc_blocks := [phi_gddr, phi_sbox],
@@ -198,7 +198,7 @@ definition "node_16_lut1 = empty_spec \<lparr>
 \<rparr>"
 
 text {* IO-MMU *}
-definition "iommu_map = (0x0000000000, 0x03FFFFFFFF)"  
+definition "iommu_map = blockn 0x0000000000 0x03FFFFFFFF"  
 
 definition "node_17_iommu = empty_spec \<lparr>
   acc_blocks := [],
@@ -211,7 +211,7 @@ definition "node_18_iommu = empty_spec \<lparr>
 \<rparr>" 
 
 text {* CPU Cores *}
-definition "lapic = (0xFEE00000, 0xFEE0FFFF)"
+definition "lapic = blockn 0xFEE00000 0xFEE0FFFF"
 definition "cpu_phys0 = empty_spec \<lparr>
   acc_blocks := [lapic],
   overlay := Some 0

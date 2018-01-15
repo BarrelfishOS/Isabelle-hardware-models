@@ -40,21 +40,21 @@ which interrupts are delivered to the DSP, but not under which vector. Therefore
 the vector numbers have been assumed to be the same as the for the M3 subsystem *}
 
 text {* Interrupt domains according to ARM GICv2 specification *}
-definition "sgi_domain = (0,15)" (* Software generated interrupts *)
-definition "ppi_domain = (16,31)" (* Private peripheral interrupts *)
-definition "spi_domain = (32,1019)" (* Shared peripheral interrupts *)
-definition "arm_vec_domain = (0,1020)" (* DSP/M3 input *)
+definition "sgi_domain     = blockn 0 15" (* Software generated interrupts *)
+definition "ppi_domain     = blockn 16 31" (* Private peripheral interrupts *)
+definition "spi_domain     = blockn 32 1019" (* Shared peripheral interrupts *)
+definition "arm_vec_domain = blockn 0 1020" (* DSP/M3 input *)
   
 text {* A9 Core 0. Can create SGI on A9 Core 1. *}
 definition "node_0_a9_0 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 1 0] 
+  map_blocks := [one_map (0,{}) 1 0] 
 \<rparr>" 
 
 text {* A9 Core 1. Can create SGI on A9 core 0. *}
 definition "node_1_a9_1 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 0 0] 
+  map_blocks := [one_map (0, {}) 0 0] 
 \<rparr>" 
   
 text {* 2: DSP. Cannot create interrupts. *}
@@ -91,13 +91,13 @@ text {* GIC Dist: The GIC can't change vector numbers, but destination for SPIs 
 definition "node_7_gic = empty_spec \<lparr>
   acc_blocks := [],
   map_blocks := [
-  one_map 73 5 73,                (* GPTIMER5 41+32  to core 0 *) 
-  one_map 131 5 131,              (* Audio 99+32 to core 0 *)
-  one_map 132 5 132,              (* M3 MMU2 100+32 *)
-  one_map 44 5 44,                (* SDMA interrupts: 12-15+32 to core 0 *)
-  one_map 45 5 45,                (* ... to core 0 *)
-  one_map 46 6 46,                (* ... to core 1 *)
-  one_map 47 6 47                 (* ... to core 1 *)
+  one_map (73, {}) 5 73,                (* GPTIMER5 41+32  to core 0 *) 
+  one_map (131, {}) 5 131,              (* Audio 99+32 to core 0 *)
+  one_map (132, {}) 5 132,              (* M3 MMU2 100+32 *)
+  one_map (44, {}) 5 44,                (* SDMA interrupts: 12-15+32 to core 0 *)
+  one_map (45, {}) 5 45,                (* ... to core 0 *)
+  one_map (46, {}) 6 46,                (* ... to core 1 *)
+  one_map (47, {}) 6 47                 (* ... to core 1 *)
 ]
 \<rparr>"
   
@@ -123,35 +123,35 @@ definition "node_10_nvic_1 = empty_spec \<lparr>
 text {*  A9 Core 0 Private Timer *}
 definition "node_11_pt_0 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 5 29] 
+  map_blocks := [one_map (0, {}) 5 29] 
 \<rparr>"
   
 text {* A9 Core 1 Private Timer. *}
 definition "node_12_pt_1 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 6 29]  
+  map_blocks := [one_map (0, {}) 6 29]  
 \<rparr>"
   
 text {* GPTIMER5: DSP is under NDA, vec 41 is guessed. *}
 definition "node_13_gptimer5 = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 16 41] (* destination set of 3 is [(16,41), (8,41)] *)
+  map_blocks := [one_map (0, {}) 16 41] (* destination set of 3 is [(16,41), (8,41)] *)
 \<rparr>"
   
 text {* Audio *}
 definition "node_14_audio = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 16 99] 
+  map_blocks := [one_map (0, {}) 16 99] 
 \<rparr>"
   
 text {* SDMA: Generates four interrupts. *}
 definition "node_15_sdma = empty_spec \<lparr>
   acc_blocks := [],
   map_blocks := [
-    one_map 0 16 12, (* destination set of 0 is [(16,12),(8,18),(9,18),(10,18)] *)
-    one_map 1 16 13, (* destination set of 1 is [(16,13),(8,19),(9,19),(10,19)] *)
-    one_map 2 16 14, (* destination set of 2 is [(16,14),(9,20),(10,20)] *)
-    one_map 3 16 15  (* destination set of 3 is [(16,15),(9,21),(10,21)] *)
+    one_map (0, {}) 16 12, (* destination set of 0 is [(16,12),(8,18),(9,18),(10,18)] *)
+    one_map (1, {}) 16 13, (* destination set of 1 is [(16,13),(8,19),(9,19),(10,19)] *)
+    one_map (2, {}) 16 14, (* destination set of 2 is [(16,14),(9,20),(10,20)] *)
+    one_map (3, {}) 16 15  (* destination set of 3 is [(16,15),(9,21),(10,21)] *)
   ]  
 \<rparr>"
   
@@ -159,14 +159,14 @@ text {* SPI: map from datasheet space into GIC space. Adds 32 to each vector num
 definition "node_16_spimap = empty_spec \<lparr>
   acc_blocks := [],
   map_blocks := [
-  block_map (0, 987) 7 32  (* GIC accepts at most 1019-32 interrupts *)
+  block_map (blockn 0 987) 7 32  (* GIC accepts at most 1019-32 interrupts *)
 ]
 \<rparr>"
 
 text {* GPTIMER5 *}
 definition "node_17_m3mmu = empty_spec \<lparr>
   acc_blocks := [],
-  map_blocks := [one_map 0 16 100] 
+  map_blocks := [one_map (0, {}) 16 100] 
 \<rparr>"
 
 definition "sys = [

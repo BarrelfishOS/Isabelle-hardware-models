@@ -30,10 +30,10 @@ theory IntroductionPC
   imports "../model/Syntax"
 begin
                      
-definition "loram = (0x000001000, 0x07fffffff)"  (* 2G-4k *)
-definition "lapic = (0x0fee00000, 0x0fee0ffff)"  (* 64k *)
-definition "mmio =  (0x0fff00000, 0x0fff00ffff)" (* 64k *)
-definition "hiram = (0x100000000, 0x27fffffff)"  (* 6G *)
+definition "loram = blockn 0x000001000 0x007fffffff"  (* 2G-4k *)
+definition "lapic = blockn 0x0fee00000 0x00fee0ffff"  (* 64k *)
+definition "mmio =  blockn 0x0fff00000 0x0fff00ffff" (* 64k *)
+definition "hiram = blockn 0x100000000 0x027fffffff"  (* 6G *)
                        
 text {* Node 0, the interconnect. *}
 definition "interconnect = empty_spec \<lparr>
@@ -55,10 +55,10 @@ definition "cpu = empty_spec \<lparr>
 
 text {* Virtual Address Spaces *}
 
-definition "vas_loram = (0x000001000, 0x07fffffff)"
-definition "vas_hiram = (0x080000000, 0x2ffffffff)"
-definition "vas_mmio =  (0xfb00000000, 0xfb0000ffff)"
-definition "vas_lapic = (0x1b10000000, 0x1b1000ffff)"
+definition "vas_loram = blockn 0x000001000 0x07fffffff"
+definition "vas_hiram = blockn 0x080000000 0x2ffffffff"
+definition "vas_mmio =  blockn 0xfb00000000 0xfb0000ffff"
+definition "vas_lapic = blockn 0x1b10000000 0x1b1000ffff"
   
 definition "cpu0_virt = empty_spec \<lparr>
   acc_blocks := [],

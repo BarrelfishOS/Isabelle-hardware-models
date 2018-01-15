@@ -247,6 +247,7 @@ proof cases
         tlb = \<lparr>
           capacity = capacity (tlb mpt), 
           wired = wired (tlb mpt), 
+          random = random (tlb mpt), 
           entries = 
             (entries (tlb mpt))(i := MIPSPT_mk_tlbentry (pte mpt) as vpn) \<rparr>,
         pte = (pte mpt) \<rparr>   \<Longrightarrow> 
@@ -271,6 +272,7 @@ proof cases
          t \<in> {t2 | t2 i. t2= \<lparr>
            capacity = capacity (tlb mpt), 
            wired = wired (tlb mpt), 
+           random = random (tlb mpt), 
            entries = 
             (entries (tlb mpt))(i := MIPSPT_mk_tlbentry (pte mpt) as vpn)\<rparr> \<and>
              i \<in> RandomIndexRange (tlb mpt)}}.
@@ -283,6 +285,7 @@ proof cases
          tlb = \<lparr>
           capacity = capacity (tlb mpt), 
           wired = wired (tlb mpt), 
+          random = random (tlb mpt), 
           entries = 
             (entries (tlb mpt))(i := MIPSPT_mk_tlbentry (pte mpt) as vpn)\<rparr>, 
          pte = pte mpt\<rparr>))"
@@ -813,6 +816,7 @@ text "Next we show the equivalence of the translate function to be equal to
 lemma MipsTLBPT_translate_is:
   assumes inrange: "vpn < MIPSPT_EntriesMax"
     and inrange2: "as < ASIDMax"
+    and cap: "capacity (tlb mtlb) > 0"
     and  valid: "MipsTLBPT_valid mtlb"
   shows "MipsTLBPT_translate mtlb as vpn = 
            (if (v ((entry (pte mtlb)) vpn as))
@@ -843,6 +847,7 @@ proof cases
            (\<exists>i. t = \<lparr>
             capacity = capacity (tlb mtlb), 
             wired = wired (tlb mtlb), 
+            random = random (tlb mtlb), 
             entries = (entries (tlb mtlb))(
                 i := MIPSPT_mk_tlbentry (pte mtlb) as vpn)\<rparr>
          \<and> i \<in> RandomIndexRange (tlb mtlb))}"
@@ -853,6 +858,7 @@ proof cases
           \<exists>i. m = \<lparr>tlb = \<lparr>
               capacity = capacity (tlb mtlb), 
               wired = wired (tlb mtlb), 
+              random = random (tlb mtlb), 
               entries = (entries (tlb mtlb))(
                   i := MIPSPT_mk_tlbentry (pte mtlb) as vpn)\<rparr>, pte = pte mtlb\<rparr> 
             \<and> i \<in> RandomIndexRange (tlb mtlb)}"
@@ -864,6 +870,7 @@ proof cases
            m = \<lparr>tlb = \<lparr>
               capacity = capacity (tlb mtlb), 
               wired = wired (tlb mtlb), 
+              random = random (tlb mtlb), 
               entries = (entries (tlb mtlb))(
               i := MIPSPT_mk_tlbentry (pte mtlb) as vpn)\<rparr>, pte = pte mtlb\<rparr> \<and>
            i \<in> RandomIndexRange (tlb mtlb)}"
@@ -877,6 +884,7 @@ proof cases
        m = \<lparr>tlb = \<lparr>
             capacity = capacity (tlb mtlb), 
             wired = wired (tlb mtlb), 
+            random = random (tlb mtlb), 
             entries = (entries (tlb mtlb))(i := MIPSPT_mk_tlbentry (pte mtlb) as vpn)\<rparr>,
            pte = pte mtlb\<rparr> \<and>
            i \<in> RandomIndexRange (tlb mtlb)}"
@@ -884,7 +892,7 @@ proof cases
     
     have X6:  " ... = \<Union>{ {pa| pa j. pa \<in> TLBENTRY_translate (MIPSPT_mk_tlbentry (pte mtlb) as vpn) as vpn \<and> j < capacity (tlb m) \<and> i = j}
        \<union> {pa| pa j. pa \<in> TLBENTRY_translate (entries (tlb m) j) as vpn \<and> j < capacity (tlb m) \<and> i \<noteq> j} |m i.
-       m = \<lparr>tlb = \<lparr>capacity = capacity (tlb mtlb), wired = wired (tlb mtlb), entries = (entries (tlb mtlb))(i := MIPSPT_mk_tlbentry (pte mtlb) as vpn)\<rparr>, pte = pte mtlb\<rparr> \<and>
+       m = \<lparr>tlb = \<lparr>capacity = capacity (tlb mtlb), wired = wired (tlb mtlb), random = random (tlb mtlb),  entries = (entries (tlb mtlb))(i := MIPSPT_mk_tlbentry (pte mtlb) as vpn)\<rparr>, pte = pte mtlb\<rparr> \<and>
            i \<in> RandomIndexRange (tlb mtlb)}"
       by(auto)
 
@@ -901,8 +909,8 @@ proof cases
       by(auto simp add:MIPSTLB_fault_no_translate)
         
     have X10: " ... =  {pa | pa i. pa \<in> TLBENTRY_translate (MIPSPT_mk_tlbentry (pte mtlb) as vpn) as vpn \<and> i \<in> RandomIndexRange (tlb mtlb)}"
-      by(auto simp:RandomIndex_in_capacity)
-    
+      by(auto simp:RandomIndex_in_capacity cap)
+
      from tlbvalid have X11 : " ... =   (if (v ((entry  (pte mtlb)) vpn as)) then {(pfn ((entry   (pte mtlb)) vpn as))} else {})"
        by(auto simp add:MIPSPT_TLBENTRY_translate_is RandomIndexRange_def TLBValid_def)
    

@@ -111,6 +111,7 @@ definition MipsTLBPT_update_tlb :: "MipsTLBPT \<Rightarrow> ASID \<Rightarrow> V
          tlb = \<lparr> 
             capacity = (capacity (tlb mpt)), 
             wired = (wired (tlb mpt)), 
+            random = random (tlb mpt), 
             entries = (entries (tlb mpt))(
                (MIPSTLBIndex (tlb mpt) (MIPSPT_mk_tlbentry (pte mpt) as vpn))
                 :=  MIPSPT_mk_tlbentry (pte mpt) as vpn) \<rparr>, 
