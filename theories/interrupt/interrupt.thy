@@ -133,7 +133,7 @@ definition irq_nat_decode :: "nat \<Rightarrow> IRQ option" where
   "irq_nat_decode n = (case (irq_format_nat_decode (fst (prod_decode n))) of (Some fmt) \<Rightarrow> (Some \<lparr>format = fmt,
    port = (snd (prod_decode n)) \<rparr> ) | None \<Rightarrow> None)"
 
-lemma "irq_nat_decode(irq_nat_encode x) = Some x"
+lemma irq_enc_inv: "irq_nat_decode(irq_nat_encode x) = Some x"
   by(simp add:irq_nat_encode_def add:irq_nat_decode_def add:format_enc_inv)
 
 
@@ -175,6 +175,8 @@ subsection "Lifting Result"
 (* definition config_change :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> SYSTEM"
   where "config_change sys ctrl = replace_system sys ctrl \<lparr>format = FEMPTY, port = 0 \<rparr>" *)
 
+
+
 (*  definition config_change_node :: "" *)
 
 (* assume change is in set of mapvalid *)
@@ -184,6 +186,42 @@ subsection "Lifting Result"
     
 definition mk_net :: "SYSTEM \<Rightarrow> net"
   where "mk_net s = (\<lambda>nodeid. mk_node s nodeid)"
+
+(* modify node such that addr will now map to name set *)
+definition replace_node :: "node \<Rightarrow> addr \<Rightarrow> name set \<Rightarrow> node" where
+  "replace_node n inp out = n \<lparr> translate := (\<lambda> a. if a=inp then out else translate n a) \<rparr>"
+
+
+(* assume: inirq \<rightarrow> has no mapping at ctrl
+   ctrl is a nat, that represents the controller id in the interrupt net and in the decoding net  *)
+lemma lifts: 
+  (* ctrl exists *)
+  assumes ctrl_exists: "((controller sys) ctrl) = Some ctrlx" 
+  (* No mapping for inirq at ctrl exists *)
+  and no_init_mapping: "(map (fst ctrlx)) inirq = {}"         
+  (* Assume an identity net function *)
+  and ident_net: "(net sys) innodeid inport = {(innodeid, inport)}"  
+  (* Assume that inirq \<rightarrow> outirq is in mapvalid? *)
+  shows "mk_node (replace_system sys ctrl inirq {\<lparr>format = outformat, port = outport\<rparr>}) ctrl =
+         replace_node (mk_node sys ctrl) (irq_nat_encode inirq) {(outport, irq_format_nat_encode outformat)}"
+proof -
+  show ?thesis
+    apply(simp_all add:ctrl_exists add:no_init_mapping add:ident_net add:replace_system_def
+     add:replace_node_def add:mk_node_def add:replace_map_def  add:sys_ctrl_act_conf_def
+     add:conf_to_translate_def add:conf_to_translate_mod_def add:conf_to_translate_mod_c_def)
+
+  
+
+qed
+  
+  
+  
+ 
+  
+  
+  
+
+
     
   
 end
