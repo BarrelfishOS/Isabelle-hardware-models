@@ -200,19 +200,20 @@ lemma lifts:
   (* Assume the interrupt to be replaced not to be valid *)
   and inirq_valid: "irq_is_valid inirq"
   (* Assume that inirq \<rightarrow> outirq is in mapvalid? *)
-  shows "mk_node (replace_system sys ctrl inirq {\<lparr>format = outformat, port = outport\<rparr>}) ctrl =
-         replace_node (mk_node sys ctrl) (irq_nat_encode inirq) {(outport, irq_format_nat_encode outformat)}"
+  shows "mk_node (replace_system sys ctrl inirq {outirq}) ctrl =
+         replace_node (mk_node sys ctrl) (irq_nat_encode inirq) {(port outirq, irq_format_nat_encode (format outirq))}"
 proof -
-  have "mk_node (replace_system sys ctrl inirq {\<lparr>format = outformat, port = outport\<rparr>}) ctrl =
- \<lparr>accept = {}, translate = conf_to_translate (replace_system sys ctrl inirq {\<lparr>format = outformat, port = outport\<rparr>}) ctrl\<rparr> "
+  have "mk_node (replace_system sys ctrl inirq {outirq}) ctrl =
+ \<lparr>accept = {}, translate = conf_to_translate (replace_system sys ctrl inirq {outirq}) ctrl\<rparr> "
     by(simp add:mk_node_def)
 
-  have "conf_to_translate (replace_system sys ctrl inirq {\<lparr>format = outformat, port = outport\<rparr>}) ctrl =
-        (\<lambda>addr. conf_to_translate_mod (replace_system sys ctrl inirq {\<lparr>format = outformat, port = outport\<rparr>}) ctrl (irq_nat_decode addr))"
+  have "conf_to_translate (replace_system sys ctrl inirq {outirq}) ctrl =
+        (\<lambda>addr. conf_to_translate_mod (replace_system sys ctrl inirq {outirq}) ctrl (irq_nat_decode addr))"
     by(simp add:conf_to_translate_def)
 
-  have "(\<lambda>addr. conf_to_translate_mod (replace_system sys ctrl inirq {\<lparr>format = outformat, port = outport\<rparr>}) ctrl (irq_nat_decode addr)) =
-    X"
+  have "(\<lambda>addr. conf_to_translate_mod (replace_system sys ctrl inirq {outirq}) ctrl (irq_nat_decode addr)) =
+    (\<lambda>addr. {(a, irq_nat_encode b) |a b.
+              \<exists>x. (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and> xa \<in> (if irq_nat_decode addr = inirq then {outirq} else CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode addr))) \<and> (a, b) \<in> x})"
     apply(simp add:conf_to_translate_mod_def)
     apply(simp add:irq_set_to_name_set_def)
     apply(simp add:sys_ctrl_act_conf_def)
@@ -221,19 +222,21 @@ proof -
     apply(simp add:replace_map_def)
     apply(simp add:net_set_translate_def)
     apply(simp add:ident_net add:ident_net_def)
-    
-
- 
-
+    done
 
   show ?thesis
-    apply(simp_all add:ctrl_exists add:no_init_mapping add:ident_net add:inirq_valid
+    apply(simp_all
+     (* Assumptions *)
+     add:ctrl_exists add:no_init_mapping
+     add:ident_net add:ident_net_def
+     add:inirq_valid
+     (* definitions *)
      add:replace_system_def
      add:replace_node_def add:mk_node_def add:replace_map_def  add:sys_ctrl_act_conf_def
      add:conf_to_translate_def add:conf_to_translate_mod_def add: net_set_translate_def
      add:replace_map_ctrl_def
      (* add:irq_nat_encode_def add:irq_nat_decode_def add:irq_format_nat_encode_def add:irq_format_nat_decode_def*)
-     add:irq_set_to_name_set_def add:irq_enc_inv)
+     add:irq_set_to_name_set_def add:irq_enc_inv )
     
     
   
