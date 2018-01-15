@@ -456,6 +456,7 @@ text "The MIPS TLB has a fixed number of entries ('capacity') where some of them
 record MIPSTLB = 
   capacity  :: nat
   wired     :: nat
+  random    :: nat
   entries   :: "nat \<Rightarrow> TLBENTRY"
 
   
@@ -473,6 +474,7 @@ text "The following creates an invalid TLB, which also satisfies that state
 definition invalid_tlb :: "MIPSTLB"
   where "invalid_tlb = \<lparr> capacity = MIPSR4600Capacity, 
                          wired    = 0, 
+                         random   = MIPSR4600Capacity - 1,
                          entries  = (\<lambda>_. null_entry) \<rparr>"    
 
     
@@ -2081,7 +2083,7 @@ text "The TLBReset function initializes a new TLB at reset state.
       are undefined."
     
 definition TLB_in_reset :: "MIPSTLB \<Rightarrow> bool" where
-  "TLB_in_reset tlb \<longleftrightarrow> wired tlb = 0"
+  "TLB_in_reset tlb \<longleftrightarrow> wired tlb = 0 \<and> (random tlb = (capacity tlb - 1))"
 
 text "The invalid TLB satisfies the reset"
   
@@ -2099,6 +2101,7 @@ definition MIPSTLBInit :: "nat \<Rightarrow> nat \<Rightarrow> MIPSTLB \<Rightar
   where "MIPSTLBInit c w tlb = \<lparr> 
               capacity = c ,
               wired = w,
+              random = c - 1,
               entries = (\<lambda>n. if n < c then TLBEntryReset (n) else entries tlb n) \<rparr>"
 
 definition MIPSR4600TLBinit :: "nat \<Rightarrow> MIPSTLB \<Rightarrow> MIPSTLB"
@@ -2310,6 +2313,7 @@ definition tlbwi :: "nat \<Rightarrow> TLBENTRY \<Rightarrow> MIPSTLB \<Rightarr
   where "tlbwi idx e tlb = (if idx < (capacity tlb) then 
                                {\<lparr> capacity = (capacity tlb),
                                   wired = (wired tlb),  
+                                  random = random tlb,
                                   entries = (entries tlb)(idx :=  e) \<rparr>}
                             else 
                                UNIV)"
@@ -2318,6 +2322,7 @@ definition tlbwi :: "nat \<Rightarrow> TLBENTRY \<Rightarrow> MIPSTLB \<Rightarr
 lemma "\<And>tlb e.  (capacity tlb) > 0 \<Longrightarrow> tlbwi ((vpn2 (hi (e))) mod (capacity tlb)) e tlb =
            {\<lparr> capacity = (capacity tlb), 
              wired = (wired tlb), 
+             random = random tlb,
              entries = (entries tlb)(((vpn2 (hi (e))) mod (capacity tlb)) :=  e) \<rparr>}"
   by(simp add:tlbwi_def)
   
@@ -2342,7 +2347,8 @@ proof
   have X0:  "\<And>idx e. \<forall>t \<in> tlbwi idx e tlb. TLBValid t = 
                           TLBValid \<lparr>capacity = capacity tlb,
                                     wired = wired tlb, 
-                                    entries = (entries tlb)(idx := e)\<rparr>"
+                                    random = random tlb,
+                                    entries = (entries tlb)(idx := e) \<rparr>"
      by(simp add:tlbwi_def ir)
       
    have X1:  "TLBValid tlb \<Longrightarrow>(wired tlb) \<le> (capacity tlb) \<and> (wired tlb) < TLBMaximumWired "
@@ -2350,15 +2356,19 @@ proof
        
    have X2:  "(wired  \<lparr>capacity = capacity tlb, 
                      wired = wired tlb, 
+                     random = random tlb,
                      entries = (entries tlb)(idx := e)\<rparr>) \<le> (capacity  \<lparr>capacity = capacity tlb, 
                      wired = wired tlb, 
+                     random = random tlb,
                      entries = (entries tlb)(idx := e)\<rparr>) \<and> (wired \<lparr>capacity = capacity tlb, 
                      wired = wired tlb, 
+                     random = random tlb,
                      entries = (entries tlb)(idx := e)\<rparr> < TLBMaximumWired)"
      by(simp add:  X1 tlbvalid )
        
    have X3: "\<And>i. (TLBEntryWellFormed  \<lparr> capacity = capacity tlb, 
                                         wired = wired tlb, 
+                                        random = random tlb,
                                         entries = (entries tlb)(idx := e)\<rparr> i) =
             (TLBEntryWellFormed tlb i) \<and> TLBENTRYWellFormed e"
      by(simp add:TLBEntryWellFormed_def wf)
@@ -2368,31 +2378,35 @@ proof
   
    have X5: "TLBValid \<lparr> capacity = capacity tlb, 
                         wired = wired tlb, 
+                        random = random tlb,
                         entries = (entries tlb)(idx := e)\<rparr> = 
          (\<forall>i<(capacity tlb).
          TLBEntryWellFormed \<lparr>capacity = capacity tlb, 
                             wired = wired tlb, 
+                            random = random tlb,
                             entries = (entries tlb)(idx := e)\<rparr> i \<and>
          TLBEntryConflictSet (
                   entries \<lparr> capacity = capacity tlb, 
                            wired = wired tlb, 
+                           random = random tlb,
                            entries = (entries tlb)(idx := e)\<rparr> i)
                   \<lparr> capacity = capacity tlb, 
                     wired = wired tlb, 
+                    random = random tlb,
                     entries = (entries tlb)(idx := e)\<rparr> \<subseteq> {i})"
      by(simp only:TLBValid_def tlbvalid X2 X1, auto)
    
    have X6 : "... = (\<forall>i<(capacity tlb).
          (TLBEntryWellFormed tlb i) \<and> TLBENTRYWellFormed e \<and>
          TLBEntryConflictSet (entries
-           \<lparr> capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(idx := e)\<rparr> i)
-           \<lparr> capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(idx := e)\<rparr> \<subseteq> {i})"
+           \<lparr> capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(idx := e)\<rparr> i)
+           \<lparr> capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(idx := e)\<rparr> \<subseteq> {i})"
      by(simp add:wf X3 )
    
    have X7:  "... =  (\<forall>i<(capacity tlb).
          TLBEntryConflictSet (entries 
-          \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(idx := e)\<rparr> i) 
-          \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(idx := e)\<rparr> \<subseteq> {i})"
+          \<lparr>capacity = capacity tlb, wired = wired tlb,random = random tlb, entries = (entries tlb)(idx := e)\<rparr> i) 
+          \<lparr>capacity = capacity tlb, wired = wired tlb,random = random tlb, entries = (entries tlb)(idx := e)\<rparr> \<subseteq> {i})"
      by(simp add:X4)
        
    with wf wr ir X0 X1 X2 X3 X4 X5 X6 X7 show " \<And>idx e t. t \<in> tlbwi idx e tlb \<Longrightarrow> TLBValid t"
@@ -2413,6 +2427,7 @@ text "The MIPS TLB supports a random replacement."
 definition tlbwr :: "TLBENTRY \<Rightarrow> MIPSTLB \<Rightarrow> MIPSTLB set" where
    "tlbwr e tlb = { t2  |t2  i. t2 \<in> {\<lparr> capacity = (capacity tlb),
                                   wired = (wired tlb),  
+                                  random = random tlb,
                                   entries = (entries tlb)(i :=  e) \<rparr>} \<and> i \<in> (RandomIndexRange tlb)}"   
 
 definition tlbwr2 :: "TLBENTRY \<Rightarrow> MIPSTLB \<Rightarrow> MIPSTLB set" where
@@ -2437,7 +2452,7 @@ lemma TLBRandomUpdateValid :
 proof -
   
   from nc have NoConflictSet :
-    "\<forall>i < capacity tlb. TLBEntryConflictSet e \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {i}"
+    "\<forall>i < capacity tlb. TLBEntryConflictSet e \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {i}"
     by(simp add:TLBEntryNoConflict_def TLBEntryConflictSet_def, auto)
   
   from nc have nomatch: "\<forall>j<capacity tlb. \<not>EntryMatch e (entries tlb j)"
@@ -2446,43 +2461,44 @@ proof -
   have X0: "(\<forall>t \<in> (tlbwr e tlb). TLBValid t) = 
              (\<forall>i \<in> RandomIndexRange tlb. \<forall>t \<in>  {\<lparr> capacity = (capacity tlb),
                                   wired = (wired tlb),  
+                                  random = random tlb,
                                   entries = (entries tlb)(i :=  e) \<rparr>}. TLBValid t )"
     by(simp add:tlbwr_def, auto)
     
   from tlbvalid have X1 : " ... =  (\<forall>i\<in>RandomIndexRange tlb.
-        \<forall>t\<in>{\<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr>}.
+        \<forall>t\<in>{\<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr>}.
             (\<forall>i<capacity t. TLBEntryWellFormed t i \<and> TLBEntryConflictSet (entries t i) t \<subseteq> {i}))"
     by(simp only:TLBValid_def, auto)
 
   
   have X2 : " ... =  (\<forall>i\<in>RandomIndexRange tlb. \<forall>j<capacity tlb. 
-        \<forall>t\<in>{\<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr>}.
+        \<forall>t\<in>{\<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr>}.
             (TLBEntryWellFormed t j \<and> TLBEntryConflictSet (entries t j) t \<subseteq> {j}))"
     by(auto)      
         
   have X3: " ... =  (\<forall>i\<in>RandomIndexRange tlb. \<forall>j<capacity tlb. 
-            (TLBEntryWellFormed \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> j 
-          \<and> TLBEntryConflictSet (entries \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> j) \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j}))"
+            (TLBEntryWellFormed \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> j 
+          \<and> TLBEntryConflictSet (entries \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> j) \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j}))"
     by(auto)
       
       
   have X4: " ... = (\<forall>i\<in>RandomIndexRange tlb. \<forall>j<capacity tlb. 
-          (i = j \<longrightarrow>  (TLBEntryWellFormed \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> j 
-          \<and> TLBEntryConflictSet (entries \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> i) \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {i}) ) \<and>
-          (i \<noteq> j \<longrightarrow>   (TLBEntryWellFormed \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> j 
-          \<and> TLBEntryConflictSet (entries \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)\<rparr> j) \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j})))"
+          (i = j \<longrightarrow>  (TLBEntryWellFormed \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> j 
+          \<and> TLBEntryConflictSet (entries \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> i) \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {i}) ) \<and>
+          (i \<noteq> j \<longrightarrow>   (TLBEntryWellFormed \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> j 
+          \<and> TLBEntryConflictSet (entries \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)\<rparr> j) \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j})))"
     by(auto)    
             
    from wf tlbvalid have X6: " ... =  (\<forall>i\<in>RandomIndexRange tlb.
         \<forall>j<capacity tlb.
-           (i = j \<longrightarrow> TLBEntryConflictSet e \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {i}) \<and>
-           (i \<noteq> j \<longrightarrow> TLBEntryConflictSet (entries tlb j) \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j}))"
+           (i = j \<longrightarrow> TLBEntryConflictSet e \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {i}) \<and>
+           (i \<noteq> j \<longrightarrow> TLBEntryConflictSet (entries tlb j) \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j}))"
     by(simp add:TLBEntryWellFormed_def TLBValid_def)
 
 
   from NoConflictSet have X7 :  " ... =  (\<forall>i\<in>RandomIndexRange tlb.
         \<forall>j<capacity tlb.
-           (i \<noteq> j \<longrightarrow> TLBEntryConflictSet (entries tlb j) \<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j}))"
+           (i \<noteq> j \<longrightarrow> TLBEntryConflictSet (entries tlb j) \<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr> \<subseteq> {j}))"
     by(auto)
       
   have X8: " ... =  (\<forall>i\<in>RandomIndexRange tlb.
@@ -2624,7 +2640,7 @@ lemma TLB_to_node_lift :
     shows "ConvertToNode nd ` (tlbwi i e tlb) = {replace_entry nd ((entries tlb) i) e (ConvertToNode nd tlb)}"
 proof -
   from inrange
-  have "tlbwi i e tlb = {\<lparr>capacity = capacity tlb, wired = wired tlb, entries = (entries tlb)(i := e)\<rparr>}"
+  have "tlbwi i e tlb = {\<lparr>capacity = capacity tlb, wired = wired tlb, random = random tlb, entries = (entries tlb)(i := e)\<rparr>}"
     by(simp add:tlbwi_def)
   hence "ConvertToNode nd ` (tlbwi i e tlb) =
          {\<lparr>accept = {}, translate = \<lambda>a. \<Union>x<(capacity tlb). EntryToMap nd (if x = i then e else entries tlb x) a\<rparr>}"

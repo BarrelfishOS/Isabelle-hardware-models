@@ -216,6 +216,7 @@ definition MipsTLBLarge_create :: "MIPSPT \<Rightarrow> MIPSTLB"
   where "MipsTLBLarge_create pt =  \<lparr> 
         capacity = MipsTLBLarge_Entries, 
         wired    = 0, 
+        random = MipsTLBLarge_Entries - 1,
         entries  = (\<lambda>n. MIPSPT_mk_tlbentry pt (MipsTLBLarge_idx2asid n)
                                               (MipsTLBLarge_idx2vpn n))\<rparr>"
 
