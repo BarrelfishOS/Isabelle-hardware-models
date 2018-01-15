@@ -72,6 +72,10 @@ record SYSTEM =
   controller :: "CONTROLLER_NAME \<Rightarrow> (CONTROLLER \<times> CONTROLLER_CLASS)"
   net :: "CONTROLLER_NAME \<Rightarrow> nat \<Rightarrow> (CONTROLLER_NAME \<times> nat) set"
 
+(* An identity mapped no broadcasting net *)
+definition ident_net :: "CONTROLLER_NAME \<Rightarrow> nat \<Rightarrow> (CONTROLLER_NAME \<times> nat) set"
+  where "ident_net cn inp = {(cn, inp)}"
+
 (* In system at controller name, replace its mapping from new_inp to new_outp *)
 definition replace_system :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> IRQ \<Rightarrow> IRQ set \<Rightarrow> SYSTEM"
   where "replace_system orig name new_inp new_out = orig \<lparr>
@@ -84,6 +88,9 @@ definition replace_system :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow>
 (* IRQ is of format FMEMWRITE *)
 definition irq_is_memwrite :: "IRQ \<Rightarrow> bool"
   where "irq_is_memwrite x = (case format x of FMEMWRITE a b \<Rightarrow> True | _ \<Rightarrow> False)"
+(* IRQ valid *)
+definition irq_is_valid :: "IRQ \<Rightarrow> bool"
+  where "irq_is_memwrite x = (case format x of FINVALID a b \<Rightarrow> False | _ \<Rightarrow> True)"
 
 
 (* Arguments that do not produce an empty set, see dom *)
@@ -180,7 +187,6 @@ definition mk_net :: "SYSTEM \<Rightarrow> net"
 definition replace_node :: "node \<Rightarrow> addr \<Rightarrow> name set \<Rightarrow> node" where
   "replace_node n inp out = n \<lparr> translate := (\<lambda> a. if a=inp then out else translate n a) \<rparr>"
 
-
 (* assume: inirq \<rightarrow> has no mapping at ctrl
    ctrl is a nat, that represents the controller id in the interrupt net and in the decoding net  *)
 lemma lifts: 
@@ -189,16 +195,48 @@ lemma lifts:
   (* No mapping for inirq at ctrl exists *)
   and no_init_mapping: "(map (fst ctrlx)) inirq = {}"         
   (* Assume an identity net function *)
-  and ident_net: "(net sys) innodeid inport = {(innodeid, inport)}"  
+  and ident_net: "net sys = ident_net" 
+  (* and sutppo_net: "net sys = (\<lambda> _. \<lambda> _. {})"  *)
+  (* Assume the interrupt to be replaced not to be valid *)
+  and inirq_valid: "irq_is_valid inirq"
   (* Assume that inirq \<rightarrow> outirq is in mapvalid? *)
   shows "mk_node (replace_system sys ctrl inirq {\<lparr>format = outformat, port = outport\<rparr>}) ctrl =
          replace_node (mk_node sys ctrl) (irq_nat_encode inirq) {(outport, irq_format_nat_encode outformat)}"
 proof -
-  show ?thesis
-    apply(simp_all add:ctrl_exists add:no_init_mapping add:ident_net add:replace_system_def
-     add:replace_node_def add:mk_node_def add:replace_map_def  add:sys_ctrl_act_conf_def
-     add:conf_to_translate_def add:conf_to_translate_mod_def)
+  have "mk_node (replace_system sys ctrl inirq {\<lparr>format = outformat, port = outport\<rparr>}) ctrl =
+ \<lparr>accept = {}, translate = conf_to_translate (replace_system sys ctrl inirq {\<lparr>format = outformat, port = outport\<rparr>}) ctrl\<rparr> "
+    by(simp add:mk_node_def)
 
+  have "conf_to_translate (replace_system sys ctrl inirq {\<lparr>format = outformat, port = outport\<rparr>}) ctrl =
+        (\<lambda>addr. conf_to_translate_mod (replace_system sys ctrl inirq {\<lparr>format = outformat, port = outport\<rparr>}) ctrl (irq_nat_decode addr))"
+    by(simp add:conf_to_translate_def)
+
+  have "(\<lambda>addr. conf_to_translate_mod (replace_system sys ctrl inirq {\<lparr>format = outformat, port = outport\<rparr>}) ctrl (irq_nat_decode addr)) =
+    X"
+    apply(simp add:conf_to_translate_mod_def)
+    apply(simp add:irq_set_to_name_set_def)
+    apply(simp add:sys_ctrl_act_conf_def)
+    apply(simp add:replace_system_def)
+    apply(simp add:replace_map_ctrl_def)
+    apply(simp add:replace_map_def)
+    apply(simp add:net_set_translate_def)
+    apply(simp add:ident_net add:ident_net_def)
+    
+
+ 
+
+
+  show ?thesis
+    apply(simp_all add:ctrl_exists add:no_init_mapping add:ident_net add:inirq_valid
+     add:replace_system_def
+     add:replace_node_def add:mk_node_def add:replace_map_def  add:sys_ctrl_act_conf_def
+     add:conf_to_translate_def add:conf_to_translate_mod_def add: net_set_translate_def
+     add:replace_map_ctrl_def
+     (* add:irq_nat_encode_def add:irq_nat_decode_def add:irq_format_nat_encode_def add:irq_format_nat_decode_def*)
+     add:irq_set_to_name_set_def add:irq_enc_inv)
+    
+    
+  
 qed
   
   
