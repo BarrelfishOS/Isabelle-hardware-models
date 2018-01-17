@@ -129,43 +129,40 @@ lemma format_dec_inv_rest:
   shows "irq_format_nat_encode(irq_format_nat_decode x) = x"
   
 proof -
-  from e1 have R3: "Suc (Suc (x - 2)) = x"
+  from e1 have "Suc (Suc (x - 2)) = x"
     by(simp)
 
-  show ?thesis
+  thus ?thesis
     apply(simp add:irq_format_nat_encode_def irq_format_nat_decode_def)
-    by(metis prod.collapse prod_decode_inverse R3)
+    by(metis prod.collapse prod_decode_inverse)
 qed
     
 
 lemma format_dec_inv[simp]:
   shows "irq_format_nat_encode(irq_format_nat_decode x) = x"
 proof cases
-  assume c0: "x=0"
-  then show ?thesis
-    by(simp add:c0 format_dec_inv_0)
+  assume "x=0"
+  thus ?thesis
+    by(simp add:format_dec_inv_0)
 next
   assume nc0: "(x :: nat) \<noteq>0"
-  then show ?thesis
+  thus ?thesis
   proof cases
-    assume c1: "(x :: nat) =1"
-    then show ?thesis
-      by(simp add:nc0 format_dec_inv_1)
+    assume "(x :: nat) =1"
+    thus ?thesis by(simp add:nc0 format_dec_inv_1)
   next
     assume nc1: "(x :: nat) \<noteq>1"
-    then show ?thesis
+    thus ?thesis
     proof cases
-      assume c2: "(x :: nat) =2"
-      then show ?thesis
-        by(simp add:c2 format_dec_inv_2)
+      assume "(x :: nat) =2"
+      thus ?thesis by(simp add:format_dec_inv_2)
     next
       assume nc2: "(x :: nat) \<noteq>2"
-      then show ?thesis
+      thus ?thesis
       proof -
         have R1: "(x :: nat) > 2"
           using nc0 nc1 nc2 by linarith
-        show ?thesis
-          by(simp add:R1 format_dec_inv_rest)
+        thus ?thesis by(simp add:format_dec_inv_rest)
       qed
     qed
   qed
@@ -177,31 +174,41 @@ lemma irq_enc_inv[simp]: "irq_nat_decode(irq_nat_encode x) = x"
 lemma irq_dec_inv[simp]: "irq_nat_encode(irq_nat_decode x) = x"
   by(simp add:irq_nat_encode_def irq_nat_decode_def)
 
-lemma irq_enc_02: 
-  shows "(irq_nat_encode inirq = addr) \<Longrightarrow> (inirq = irq_nat_decode addr)"
-  apply(simp add:irq_nat_decode_def add:irq_nat_encode_def)
-  apply(auto)
-  done
+lemma inj_irq_nat_encode: "inj_on irq_nat_encode A"
+  by (rule inj_on_inverseI) (rule irq_enc_inv)
 
-lemma irq_enc_03:
-  assumes L1: "addr \<noteq> irq_nat_encode inirq"
-  shows "irq_nat_decode addr \<noteq> inirq"
-proof -
-  from L1 have L2: "irq_nat_encode(irq_nat_decode addr) \<noteq> irq_nat_encode inirq"
-    by(auto)
-  from L1 L2 show ?thesis by(auto)
-qed 
+lemma inj_irq_nat_decode: "inj_on irq_nat_decode A"
+  by (rule inj_on_inverseI) (rule irq_dec_inv)
 
+lemma surj_irq_nat_encode: "surj irq_nat_encode"
+  by (rule surjI) (rule irq_dec_inv)
 
+lemma surj_irq_nat_decode: "surj irq_nat_decode"
+  by (rule surjI) (rule irq_enc_inv)
+
+lemma bij_irq_nat_encode: "bij irq_nat_encode"
+  by (rule bijI [OF inj_irq_nat_encode surj_irq_nat_encode])
+
+lemma bij_irq_nat_decode: "bij irq_nat_decode"
+  by (rule bijI [OF inj_irq_nat_decode surj_irq_nat_decode])
+
+lemma irq_nat_encode_eq: "irq_nat_encode x = irq_nat_encode y \<longleftrightarrow> x = y"
+  by (rule inj_irq_nat_encode [THEN inj_eq])
+
+lemma irq_nat_decode_eq: "irq_nat_decode x = irq_nat_decode y \<longleftrightarrow> x = y"
+  by (rule inj_irq_nat_decode [THEN inj_eq])
 
 (* ------------------------------------------------------------------------- *)  
 subsection "Incremental configuration change of controllers"
 (* ------------------------------------------------------------------------- *)   
 
 definition replace_map :: "CONTROLLER \<Rightarrow> IRQ \<Rightarrow> IRQ set \<Rightarrow> CONTROLLER"
-  where "replace_map orig new_inp new_out = orig \<lparr> map := (\<lambda>i. (if i = new_inp then new_out else (map orig) i)) \<rparr>"  
+  where "replace_map orig new_inp new_out = orig \<lparr> map :=
+    (\<lambda>i. (if i = new_inp then new_out else (map orig) i))
+   \<rparr>"  
 
-definition replace_map_ctrl :: "(CONTROLLER \<times> CONTROLLER_CLASS) \<Rightarrow> IRQ \<Rightarrow> IRQ set \<Rightarrow> (CONTROLLER \<times> CONTROLLER_CLASS)"
+definition replace_map_ctrl :: "(CONTROLLER \<times> CONTROLLER_CLASS) \<Rightarrow> IRQ \<Rightarrow> IRQ set \<Rightarrow>
+          (CONTROLLER \<times> CONTROLLER_CLASS)"
   where "replace_map_ctrl orig new_inp new_out = (replace_map (fst orig) new_inp new_out, snd orig)"  
  
 (* An identity mapped no broadcasting net *)
@@ -241,7 +248,8 @@ subsection "From IRQ system to decoding net definitions"
 (* ------------------------------------------------------------------------- *)   
 (* iis is an output set at c,  perform net lookup to give back input interrupts at controllers (as set)*)
 definition net_set_translate :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> IRQ set \<Rightarrow> (CONTROLLER_NAME \<times> IRQ) set"
-  where "net_set_translate s c iis = \<Union> { {(fst y, \<lparr> format = (format x), port = (snd y)\<rparr>) | y. y \<in> ((net s) c (port x))} | x. x \<in> iis }"
+  where "net_set_translate s c iis = \<Union> { {(fst y, \<lparr> format = (format x), port = (snd y)\<rparr>) |
+     y. y \<in> ((net s) c (port x))} | x. x \<in> iis }"
 
 (* A set of input interrupts translated to a a name set *)
 definition irq_set_to_name_set :: "(CONTROLLER_NAME \<times> IRQ) set \<Rightarrow> name set"
@@ -277,20 +285,17 @@ subsection "Lifting Result"
 
 (* TODO: move this into the proof of the lifting lemma *)
 lemma lifts_inner : "({(a, (irq_nat_encode b, {})) |a b.
-              \<exists>x. (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and> xa \<in> (if irq_nat_decode (fst addr) = inirq then {outirq} else CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode (fst addr)))) \<and> (a, b) \<in> x}) =
+              \<exists>x. (
+                \<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and>
+                xa \<in> (if irq_nat_decode (fst addr) = inirq then {outirq}
+                      else CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode (fst addr))))
+                      \<and> (a, b) \<in> x}) =
     (if (fst addr) = irq_nat_encode inirq then {(ctrl, (irq_nat_encode outirq, {}))}
-          else {(aa, (irq_nat_encode b, {})) |aa b. \<exists>x. (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and> xa \<in> CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode (fst addr))) \<and> (aa, b) \<in> x})"
-  proof cases
-    assume e1: "fst addr = irq_nat_encode inirq"
-    then show ?thesis
-      apply(simp add:e1)
-      by(simp add:irq_nat_encode_def)
-
-  next 
-    assume e2: "fst addr \<noteq> irq_nat_encode inirq"
-    then show ?thesis
-      by(simp add:irq_enc_03)
-  qed
+          else {(aa, (irq_nat_encode b, {})) |aa b. \<exists>x.
+          (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and>
+          xa \<in> CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode (fst addr)))
+          \<and> (aa, b) \<in> x})"
+  by(auto, simp add:irq_nat_encode_def)
 
 
 lemma lifts: 
@@ -298,11 +303,11 @@ lemma lifts:
   assumes ident_net: "net sys = ident_net" 
   (* Assume that inirq \<rightarrow> outirq is in mapvalid? *)
   shows "mk_node (replace_system sys ctrl inirq {outirq}) ctrl =
-         replace_node (mk_node sys ctrl) (irq_nat_encode inirq) {(ctrl, (irq_nat_encode outirq, {}))}"
+       replace_node (mk_node sys ctrl) (irq_nat_encode inirq) {(ctrl, (irq_nat_encode outirq, {}))}"
 proof -
   (* Simplify both side until we apply lemma lifts_inner *)
 
-  (* lleft side *)
+  (* left side *)
   have L1: "mk_node (replace_system sys ctrl inirq {outirq}) ctrl =
  \<lparr>accept = {}, translate = conf_to_translate (replace_system sys ctrl inirq {outirq}) ctrl\<rparr> "
     by(simp add:mk_node_def)
@@ -314,7 +319,9 @@ proof -
   (* continue only with translate function *)
   have L3: "(\<lambda>addr. conf_to_translate_mod (replace_system sys ctrl inirq {outirq}) ctrl (irq_nat_decode (fst addr))) =
     (\<lambda>addr. {(a, (irq_nat_encode b, {})) |a b.
-              \<exists>x. (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and> xa \<in> (if irq_nat_decode (fst addr) = inirq then {outirq} else CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode (fst addr)))) \<and> (a, b) \<in> x})"
+              \<exists>x. (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and> xa \<in>
+              (if irq_nat_decode (fst addr) = inirq then {outirq} else
+              CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode (fst addr)))) \<and> (a, b) \<in> x})"
     apply(simp add:conf_to_translate_mod_def)
     apply(simp add:irq_set_to_name_set_def)
     apply(simp add:sys_ctrl_act_conf_def)
@@ -326,7 +333,10 @@ proof -
     done
 
   (* right side *)
-  have R1: "replace_node (interrupt.mk_node sys ctrl) (irq_nat_encode inirq) {(ctrl, (irq_nat_encode outirq, {}))} = \<lparr>accept = {}, translate = \<lambda>a. if (fst a) = irq_nat_encode inirq then {(ctrl, (irq_nat_encode outirq, {}))} else translate \<lparr>accept = {}, translate = conf_to_translate sys ctrl\<rparr> a\<rparr>"
+  have R1: "replace_node (interrupt.mk_node sys ctrl) (irq_nat_encode inirq)
+            {(ctrl, (irq_nat_encode outirq, {}))} = \<lparr>accept = {}, translate =
+            \<lambda>a. if (fst a) = irq_nat_encode inirq then {(ctrl, (irq_nat_encode outirq, {}))}
+             else translate \<lparr>accept = {}, translate = conf_to_translate sys ctrl\<rparr> a\<rparr>"
     apply(simp add:replace_node_def add:mk_node_def)
     done
 
@@ -335,7 +345,8 @@ proof -
          |a b. \<exists>x. (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and>
          xa \<in> CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode (fst addr))) \<and> (a, b) \<in> x})"
     apply(auto)
-    apply(simp add:conf_to_translate_def add:conf_to_translate_mod_def add:irq_set_to_name_set_def add:net_set_translate_def)
+    apply(simp add:conf_to_translate_def add:conf_to_translate_mod_def add:irq_set_to_name_set_def
+        add:net_set_translate_def)
     apply(simp add:ident_net add:ident_net_def)
     apply(simp add:sys_ctrl_act_conf_def)
     done
@@ -344,9 +355,8 @@ proof -
     apply(simp only:R1)
     apply(simp only:R21)
     apply(simp add:L1 add:L2 add:L3)
-    apply(simp add:lifts_inner) 
+    apply(simp add:lifts_inner)
     done
 qed
-     
   
 end
