@@ -55,6 +55,11 @@ record CONTROLLER_CLASS =
 record CONTROLLER =
   map      :: "IRQ \<Rightarrow> IRQ set"
 
+(* Interconnect of the system + each controller with a class *)
+record SYSTEM =
+  controller :: "CONTROLLER_NAME \<Rightarrow> (CONTROLLER \<times> CONTROLLER_CLASS)"
+  net :: "CONTROLLER_NAME \<Rightarrow> nat \<Rightarrow> (CONTROLLER_NAME \<times> nat) set"
+
 
 (* ------------------------------------------------------------------------- *)  
 subsection "IRQ / IRQ Format definitions"
@@ -172,10 +177,26 @@ lemma irq_enc_inv[simp]: "irq_nat_decode(irq_nat_encode x) = x"
 lemma irq_dec_inv[simp]: "irq_nat_encode(irq_nat_decode x) = x"
   by(simp add:irq_nat_encode_def irq_nat_decode_def)
 
+lemma irq_enc_02: 
+  shows "(irq_nat_encode inirq = addr) \<Longrightarrow> (inirq = irq_nat_decode addr)"
+  apply(simp add:irq_nat_decode_def add:irq_nat_encode_def)
+  apply(auto)
+  done
+
+lemma irq_enc_03:
+  assumes L1: "addr \<noteq> irq_nat_encode inirq"
+  shows "irq_nat_decode addr \<noteq> inirq"
+proof -
+  from L1 have L2: "irq_nat_encode(irq_nat_decode addr) \<noteq> irq_nat_encode inirq"
+    by(auto)
+  from L1 L2 show ?thesis by(auto)
+qed 
 
 
 
-
+(* ------------------------------------------------------------------------- *)  
+subsection "Incremental configuration change of controllers"
+(* ------------------------------------------------------------------------- *)   
 
 definition replace_map :: "CONTROLLER \<Rightarrow> IRQ \<Rightarrow> IRQ set \<Rightarrow> CONTROLLER"
   where "replace_map orig new_inp new_out = orig \<lparr> map := (\<lambda>i. (if i = new_inp then new_out else (map orig) i)) \<rparr>"  
@@ -183,11 +204,6 @@ definition replace_map :: "CONTROLLER \<Rightarrow> IRQ \<Rightarrow> IRQ set \<
 definition replace_map_ctrl :: "(CONTROLLER \<times> CONTROLLER_CLASS) \<Rightarrow> IRQ \<Rightarrow> IRQ set \<Rightarrow> (CONTROLLER \<times> CONTROLLER_CLASS)"
   where "replace_map_ctrl orig new_inp new_out = (replace_map (fst orig) new_inp new_out, snd orig)"  
  
-(* Interconnect of the system + each controller with a class *)
-record SYSTEM =
-  controller :: "CONTROLLER_NAME \<Rightarrow> (CONTROLLER \<times> CONTROLLER_CLASS)"
-  net :: "CONTROLLER_NAME \<Rightarrow> nat \<Rightarrow> (CONTROLLER_NAME \<times> nat) set"
-
 (* An identity mapped no broadcasting net *)
 definition ident_net :: "CONTROLLER_NAME \<Rightarrow> nat \<Rightarrow> (CONTROLLER_NAME \<times> nat) set"
   where "ident_net cn inp = {(cn, inp)}"
@@ -198,10 +214,6 @@ definition replace_system :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow>
       controller := (controller orig)(name := replace_map_ctrl ((controller orig)name) new_inp new_out)
     \<rparr>"
   
-
-
-
-
 
 (* Arguments that do not produce an empty set, see dom *)
 definition doms :: "('a \<Rightarrow> 'b set) \<Rightarrow> 'a set" where
@@ -224,26 +236,9 @@ definition sys_valid :: "SYSTEM \<Rightarrow> bool"
   where "sys_valid s = (\<forall> c. sys_ctrl_valid s c)" 
 
    
-
-
-
-
-lemma irq_enc_02: 
-  shows "(irq_nat_encode inirq = addr) \<Longrightarrow> (inirq = irq_nat_decode addr)"
-  apply(simp add:irq_nat_decode_def add:irq_nat_encode_def)
-  apply(auto)
-  done
-
-(* TODO: I NEED PROOF OF DIS *)
-lemma irq_enc_03:
-  assumes L1: "addr \<noteq> irq_nat_encode inirq"
-  shows "irq_nat_decode addr \<noteq> inirq"
-proof -
-  from L1 have L2: "irq_nat_encode(irq_nat_decode addr) \<noteq> irq_nat_encode inirq"
-    by(auto)
-  from L1 L2 show ?thesis by(auto)
-qed 
-
+(* ------------------------------------------------------------------------- *)  
+subsection "From IRQ system to decoding net definitions"
+(* ------------------------------------------------------------------------- *)   
 (* iis is an output set at c,  perform net lookup to give back input interrupts at controllers (as set)*)
 definition net_set_translate :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> IRQ set \<Rightarrow> (CONTROLLER_NAME \<times> IRQ) set"
   where "net_set_translate s c iis = \<Union> { {(fst y, \<lparr> format = (format x), port = (snd y)\<rparr>) | y. y \<in> ((net s) c (port x))} | x. x \<in> iis }"
@@ -268,10 +263,6 @@ definition conf_to_translate :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarr
 definition mk_node :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> node"
   where "mk_node s cn = \<lparr>accept = {}, translate = conf_to_translate s cn \<rparr>"
 
-(* ------------------------------------------------------------------------- *)  
-subsection "Lifting Result"
-(* ------------------------------------------------------------------------- *)   
-    
 definition mk_net :: "SYSTEM \<Rightarrow> net"
   where "mk_net s = (\<lambda>nodeid. mk_node s nodeid)"
 
@@ -279,10 +270,12 @@ definition mk_net :: "SYSTEM \<Rightarrow> net"
 definition replace_node :: "node \<Rightarrow> addr \<Rightarrow> name set \<Rightarrow> node" where
   "replace_node n inp out = n \<lparr> translate := (\<lambda> a. if a=inp then out else translate n a) \<rparr>"
 
+(* ------------------------------------------------------------------------- *)  
+subsection "Lifting Result"
+(* ------------------------------------------------------------------------- *)   
 
 
 (* TODO: move this into the proof of the lifting lemma *)
-
 lemma lifts_inner : "({(a, irq_nat_encode b) |a b.
               \<exists>x. (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and> xa \<in> (if irq_nat_decode addr = inirq then {outirq} else CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode addr))) \<and> (a, b) \<in> x}) =
     (if addr = irq_nat_encode inirq then {(ctrl, irq_nat_encode outirq)}
