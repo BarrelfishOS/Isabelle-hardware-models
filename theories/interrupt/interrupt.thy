@@ -30,7 +30,11 @@ theory interrupt
   imports Main Set "HOL-Library.Nat_Bijection"  "../model/Model" "../model/Syntax" 
 begin
 (*>*)
-  
+
+(* ------------------------------------------------------------------------- *)  
+subsection "Datatype definitions"
+(* ------------------------------------------------------------------------- *)   
+
 type_synonym PORT = nat
 type_synonym VECTOR = nat
 type_synonym DATA = nat
@@ -41,25 +45,137 @@ datatype FORMAT = FINVALID | FEMPTY | FVECTOR "nat" | FMEMWRITE "nat" "nat"
 record IRQ = 
   format :: FORMAT
   port :: PORT
-    
-definition NULL_IRQ :: IRQ
-  where "NULL_IRQ = \<lparr>format = FINVALID, port=0\<rparr>"  
   
 record CONTROLLER_CLASS =
   in_port_num :: nat
   out_port_num :: nat
   map_valid :: "(IRQ \<Rightarrow> IRQ set) set"
 
-
-
-
-(*
-definition extend_map "IRQ \<Rightarrow> (IRQ, IRQ set) \<Rightarrow> (IRQ \<Rightarrow> IRQ set)"
-  where "extend_map A B = {\<lambda> x.  *)
-
 (* Configuration of a controller *)  
 record CONTROLLER =
   map      :: "IRQ \<Rightarrow> IRQ set"
+
+
+(* ------------------------------------------------------------------------- *)  
+subsection "IRQ / IRQ Format definitions"
+(* ------------------------------------------------------------------------- *)   
+(* IRQ is of format FMEMWRITE *)
+definition irq_is_memwrite :: "IRQ \<Rightarrow> bool"
+  where "irq_is_memwrite x = (case format x of FMEMWRITE a b \<Rightarrow> True | _ \<Rightarrow> False)"
+
+definition irq_format_valid :: "FORMAT \<Rightarrow> bool"
+  where "irq_format_valid x = (case x of FINVALID \<Rightarrow> False | _ \<Rightarrow> True)"
+
+definition NULL_IRQ :: IRQ
+  where "NULL_IRQ = \<lparr>format = FINVALID, port=0\<rparr>"  
+
+(* IRQ valid *)
+definition irq_valid :: "IRQ \<Rightarrow> bool"
+  where "irq_valid x = irq_format_valid (format x)"
+
+(* ------------------------------------------------------------------------- *)  
+subsection "IRQ / IRQ Format nat encoding and proof of bijection"
+(* ------------------------------------------------------------------------- *)   
+(* define port+formatr to natural bijection *)
+definition irq_format_nat_encode :: "FORMAT \<Rightarrow> nat" where
+  "irq_format_nat_encode x = (case x of 
+    FINVALID \<Rightarrow> 0 |
+    FEMPTY \<Rightarrow> 1 |
+    FVECTOR a  \<Rightarrow> 2 + prod_encode (0,a) |
+    FMEMWRITE a b \<Rightarrow> 2 + prod_encode (1+a, b)
+    )"
+
+definition irq_format_nat_decode :: "nat \<Rightarrow> FORMAT" where
+  "irq_format_nat_decode x = (
+        if x = 0 then FINVALID
+   else if x = 1 then FEMPTY
+   else if fst (prod_decode (x-2)) = 0 then (FVECTOR (snd (prod_decode (x-2))))
+   else FMEMWRITE ((fst (prod_decode (x-2)))-1) (snd (prod_decode (x-2)))
+   )"
+
+definition irq_nat_encode :: "IRQ \<Rightarrow> nat" where
+  "irq_nat_encode i = prod_encode ((irq_format_nat_encode (format i)), port i)"
+
+definition irq_nat_decode :: "nat \<Rightarrow> IRQ" where
+  "irq_nat_decode n = \<lparr>format = irq_format_nat_decode (fst (prod_decode n)),
+     port = (snd (prod_decode n)) \<rparr>"
+
+lemma format_enc_inv[simp]: "irq_format_nat_decode(irq_format_nat_encode x) = x"
+  by(case_tac x, simp_all add:irq_format_nat_encode_def add:irq_format_nat_decode_def)  
+
+lemma format_dec_inv_0:
+  assumes e1: "x=0"
+  shows "irq_format_nat_encode(irq_format_nat_decode x) = x"
+  by(simp add:e1 irq_format_nat_encode_def irq_format_nat_decode_def)
+
+lemma format_dec_inv_1:
+  assumes e1: "x=1"
+  shows "irq_format_nat_encode(irq_format_nat_decode x) = x"
+  by(simp add:e1 irq_format_nat_encode_def irq_format_nat_decode_def)
+
+lemma format_dec_inv_2:
+  assumes e1: "x=2"
+  shows "irq_format_nat_encode(irq_format_nat_decode x) = x"
+    apply(simp add:irq_format_nat_encode_def irq_format_nat_decode_def e1)
+    by(metis prod.collapse prod_decode_inverse)
+
+lemma format_dec_inv_rest:
+  assumes e1: "(x :: nat) > 2"
+  shows "irq_format_nat_encode(irq_format_nat_decode x) = x"
+  
+proof -
+  from e1 have R3: "Suc (Suc (x - 2)) = x"
+    by(simp)
+
+  show ?thesis
+    apply(simp add:irq_format_nat_encode_def irq_format_nat_decode_def)
+    by(metis prod.collapse prod_decode_inverse R3)
+qed
+    
+
+lemma format_dec_inv[simp]:
+  shows "irq_format_nat_encode(irq_format_nat_decode x) = x"
+proof cases
+  assume c0: "x=0"
+  then show ?thesis
+    by(simp add:c0 format_dec_inv_0)
+next
+  assume nc0: "(x :: nat) \<noteq>0"
+  then show ?thesis
+  proof cases
+    assume c1: "(x :: nat) =1"
+    then show ?thesis
+      by(simp add:nc0 format_dec_inv_1)
+  next
+    assume nc1: "(x :: nat) \<noteq>1"
+    then show ?thesis
+    proof cases
+      assume c2: "(x :: nat) =2"
+      then show ?thesis
+        by(simp add:c2 format_dec_inv_2)
+    next
+      assume nc2: "(x :: nat) \<noteq>2"
+      then show ?thesis
+      proof -
+        have R1: "(x :: nat) > 2"
+          using nc0 nc1 nc2 by linarith
+        show ?thesis
+          by(simp add:R1 format_dec_inv_rest)
+      qed
+    qed
+  qed
+qed
+
+lemma irq_enc_inv[simp]: "irq_nat_decode(irq_nat_encode x) = x"
+  by(simp add:irq_nat_encode_def irq_nat_decode_def)
+
+lemma irq_dec_inv[simp]: "irq_nat_encode(irq_nat_decode x) = x"
+  by(simp add:irq_nat_encode_def irq_nat_decode_def)
+
+
+
+
+
 
 definition replace_map :: "CONTROLLER \<Rightarrow> IRQ \<Rightarrow> IRQ set \<Rightarrow> CONTROLLER"
   where "replace_map orig new_inp new_out = orig \<lparr> map := (\<lambda>i. (if i = new_inp then new_out else (map orig) i)) \<rparr>"  
@@ -82,19 +198,9 @@ definition replace_system :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow>
       controller := (controller orig)(name := replace_map_ctrl ((controller orig)name) new_inp new_out)
     \<rparr>"
   
-(* look at decoding net to verify *)
-(* assuming system is valid, configuration update \<Rightarrow> system valid *)  
 
-(* IRQ is of format FMEMWRITE *)
-definition irq_is_memwrite :: "IRQ \<Rightarrow> bool"
-  where "irq_is_memwrite x = (case format x of FMEMWRITE a b \<Rightarrow> True | _ \<Rightarrow> False)"
 
-definition irq_format_valid :: "FORMAT \<Rightarrow> bool"
-  where "irq_format_valid x = (case x of FINVALID \<Rightarrow> False | _ \<Rightarrow> True)"
 
-(* IRQ valid *)
-definition irq_valid :: "IRQ \<Rightarrow> bool"
-  where "irq_valid x = irq_format_valid (format x)"
 
 
 (* Arguments that do not produce an empty set, see dom *)
@@ -117,57 +223,10 @@ definition sys_ctrl_valid :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow>
 definition sys_valid :: "SYSTEM \<Rightarrow> bool"
   where "sys_valid s = (\<forall> c. sys_ctrl_valid s c)" 
 
-    
-(* define port+formatr to natural bijection *)
-definition irq_format_nat_encode :: "FORMAT \<Rightarrow> nat" where
-  "irq_format_nat_encode x = (case x of 
-    FINVALID \<Rightarrow> 0 |
-    FEMPTY \<Rightarrow> 1 |
-    FVECTOR a  \<Rightarrow> 2 + prod_encode (0,a) |
-    FMEMWRITE a b \<Rightarrow> 2 + prod_encode (1+a, b)
-    )"
+   
 
-(* If it can't be mapped, it will return FINVALID *)
-definition irq_format_nat_decode :: "nat \<Rightarrow> FORMAT" where
-  "irq_format_nat_decode x = (
-        if x = 0 then FINVALID
-   else if x = 1 then FEMPTY
-   else if fst (prod_decode (x-2)) = 0 then (FVECTOR (snd (prod_decode (x-2))))
-   else FMEMWRITE ((fst (prod_decode (x-2)))-1) (snd (prod_decode (x-2)))
-   )"
 
-value "irq_format_nat_decode (irq_format_nat_encode FINVALID)"
-value "irq_format_nat_decode (irq_format_nat_encode FEMPTY)"
-value "irq_format_nat_decode (irq_format_nat_encode (FVECTOR 3))"
-value "irq_format_nat_decode (irq_format_nat_encode (FMEMWRITE 3 7))"
 
-lemma format_enc_inv[simp]: "irq_format_nat_decode(irq_format_nat_encode x) = x"
-  by(case_tac x, simp_all add:irq_format_nat_encode_def add:irq_format_nat_decode_def)  
-
-lemma format_enc_inv_01[simp]:
-  shows "irq_format_nat_encode(irq_format_nat_decode x) = x"
-  apply(simp add:irq_format_nat_encode_def add:irq_format_nat_decode_def)
-  oops
-  
-
-lemma format_end_01:
-  shows "irq_format_nat_decode x = fmt \<Longrightarrow> x = irq_format_nat_encode fmt"
-  oops
-
-  
-definition irq_nat_encode :: "IRQ \<Rightarrow> nat" where
-  "irq_nat_encode i = prod_encode ((irq_format_nat_encode (format i)), port i)"
-
-definition irq_nat_decode :: "nat \<Rightarrow> IRQ" where
-  "irq_nat_decode n = \<lparr>format = irq_format_nat_decode (fst (prod_decode n)), port = (snd (prod_decode n)) \<rparr>"
-
-lemma irq_enc_inv[simp]: "irq_nat_decode(irq_nat_encode x) = x"
-  by(simp add:irq_nat_encode_def add:irq_nat_decode_def add:format_enc_inv)
-
-lemma irq_enc_01: 
-  shows "(irq_nat_decode addr = inirq) \<Longrightarrow> (addr = irq_nat_encode inirq)"
-  apply(simp add:irq_nat_decode_def add:irq_nat_encode_def)
-  oops
 
 lemma irq_enc_02: 
   shows "(irq_nat_encode inirq = addr) \<Longrightarrow> (inirq = irq_nat_decode addr)"
@@ -177,10 +236,13 @@ lemma irq_enc_02:
 
 (* TODO: I NEED PROOF OF DIS *)
 lemma irq_enc_03:
-  shows "addr \<noteq> irq_nat_encode inirq \<Longrightarrow> irq_nat_decode addr \<noteq> inirq"
-  apply(auto)
-  sorry
-  
+  assumes L1: "addr \<noteq> irq_nat_encode inirq"
+  shows "irq_nat_decode addr \<noteq> inirq"
+proof -
+  from L1 have L2: "irq_nat_encode(irq_nat_decode addr) \<noteq> irq_nat_encode inirq"
+    by(auto)
+  from L1 L2 show ?thesis by(auto)
+qed 
 
 (* iis is an output set at c,  perform net lookup to give back input interrupts at controllers (as set)*)
 definition net_set_translate :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> IRQ set \<Rightarrow> (CONTROLLER_NAME \<times> IRQ) set"
@@ -209,17 +271,6 @@ definition mk_node :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> node"
 (* ------------------------------------------------------------------------- *)  
 subsection "Lifting Result"
 (* ------------------------------------------------------------------------- *)   
-(* definition config_change :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> SYSTEM"
-  where "config_change sys ctrl = replace_system sys ctrl \<lparr>format = FEMPTY, port = 0 \<rparr>" *)
-
-
-
-(*  definition config_change_node :: "" *)
-
-(* assume change is in set of mapvalid *)
-(* lemma blu : "mk_node S (config_change Ctrl) = config_change_node (mk_node S Ctrl)" *)
-
-(* lemma blu: "mk_net  *)
     
 definition mk_net :: "SYSTEM \<Rightarrow> net"
   where "mk_net s = (\<lambda>nodeid. mk_node s nodeid)"
@@ -229,28 +280,36 @@ definition replace_node :: "node \<Rightarrow> addr \<Rightarrow> name set \<Rig
   "replace_node n inp out = n \<lparr> translate := (\<lambda> a. if a=inp then out else translate n a) \<rparr>"
 
 
-definition test_1 :: "SYSTEM \<Rightarrow> CONTROLLER_NAME \<Rightarrow> IRQ \<Rightarrow> IRQ \<Rightarrow> (nat \<Rightarrow> name set)"
-  where "test_1 sys ctrl inirq outirq = (\<lambda>addr.
-       {(a, irq_nat_encode b) |a b. \<exists>x. (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and> xa \<in> (if irq_nat_decode addr = inirq then {outirq} else CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode addr))) \<and> (a, b) \<in> x})"
+
+(* TODO: move this into the proof of the lifting lemma *)
+
+lemma lifts_inner : "({(a, irq_nat_encode b) |a b.
+              \<exists>x. (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and> xa \<in> (if irq_nat_decode addr = inirq then {outirq} else CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode addr))) \<and> (a, b) \<in> x}) =
+    (if addr = irq_nat_encode inirq then {(ctrl, irq_nat_encode outirq)}
+          else {(aa, irq_nat_encode b) |aa b. \<exists>x. (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and> xa \<in> CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode addr)) \<and> (aa, b) \<in> x})"
+  proof cases
+    assume e1: "addr = irq_nat_encode inirq"
+    then show ?thesis
+      apply(simp add:e1)
+      by(simp add:irq_nat_encode_def)
+
+  next 
+    assume e2: "addr \<noteq> irq_nat_encode inirq"
+    then show ?thesis
+      by(simp add:irq_enc_03)
+  qed
 
 
-(* assume: inirq \<rightarrow> has no mapping at ctrl
-   ctrl is a nat, that represents the controller id in the interrupt net and in the decoding net  *)
 lemma lifts: 
-  (* ctrl exists *)
-  (* assumes ctrl_exists: "((controller sys) ctrl) = ctrlx"  *)
-  (* No mapping for inirq at ctrl exists *)
-  assumes no_init_mapping: "(map (fst ((controller sys) ctrl))) inirq = {}"         
   (* Assume an identity net function *)
-  and ident_net: "net sys = ident_net" 
-  (* and sutppo_net: "net sys = (\<lambda> _. \<lambda> _. {})"  *)
-  (* Assume the interrupt to be replaced not to be valid *)
-  and inirq_valid: "irq_valid inirq"
+  assumes ident_net: "net sys = ident_net" 
   (* Assume that inirq \<rightarrow> outirq is in mapvalid? *)
   shows "mk_node (replace_system sys ctrl inirq {outirq}) ctrl =
          replace_node (mk_node sys ctrl) (irq_nat_encode inirq) {(ctrl, irq_nat_encode outirq)}"
 proof -
-  (* First, simplify the left side *)
+  (* Simplify both side until we apply lemma lifts_inner *)
+
+  (* lleft side *)
   have L1: "mk_node (replace_system sys ctrl inirq {outirq}) ctrl =
  \<lparr>accept = {}, translate = conf_to_translate (replace_system sys ctrl inirq {outirq}) ctrl\<rparr> "
     by(simp add:mk_node_def)
@@ -273,6 +332,7 @@ proof -
     apply(simp add:ident_net add:ident_net_def)
     done
 
+  (* right side *)
   have R1: "replace_node (interrupt.mk_node sys ctrl) (irq_nat_encode inirq) {(ctrl, irq_nat_encode outirq)} = \<lparr>accept = {}, translate = \<lambda>a. if a = irq_nat_encode inirq then {(ctrl, irq_nat_encode outirq)} else translate \<lparr>accept = {}, translate = conf_to_translate sys ctrl\<rparr> a\<rparr>"
     apply(simp add:replace_node_def add:mk_node_def)
     done
@@ -284,47 +344,20 @@ proof -
     apply(simp add:sys_ctrl_act_conf_def)
     done
     
-  (* Continue with translate only *)
+  (* continue with translate only *)
   have R2: "(if a = irq_nat_encode inirq then {(ctrl, irq_nat_encode outirq)} else (translate \<lparr>accept = {}, translate = conf_to_translate sys ctrl\<rparr>) a) = (if a = irq_nat_encode inirq then {(ctrl, irq_nat_encode outirq)}
      else {(aa, irq_nat_encode b) |aa b. \<exists>x. (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and> xa \<in> CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode a)) \<and> (aa, b) \<in> x})"
     apply(simp only:R21)
-    done    
+    done   
 
-  have TH_NOLAMBDA: "({(a, irq_nat_encode b) |a b.
-              \<exists>x. (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and> xa \<in> (if irq_nat_decode addr = inirq then {outirq} else CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode addr))) \<and> (a, b) \<in> x}) =
-    (if addr = irq_nat_encode inirq then {(ctrl, irq_nat_encode outirq)}
-          else {(aa, irq_nat_encode b) |aa b. \<exists>x. (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and> xa \<in> CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode addr)) \<and> (aa, b) \<in> x})"
-  proof cases
-    assume e1: "addr = irq_nat_encode inirq"
-    then show ?thesis
-      apply(simp add:e1)
-      by(simp add:irq_nat_encode_def)
 
-  next 
-    assume e2: "addr \<noteq> irq_nat_encode inirq"
-    then show ?thesis
-      by(simp add:irq_enc_03)
-  qed
-
-  have TH_LAMBDA: "(\<lambda>addr. {(a, irq_nat_encode b) |a b.
-              \<exists>x. (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and> xa \<in> (if irq_nat_decode addr = inirq then {outirq} else CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode addr))) \<and> (a, b) \<in> x}) =
-    (\<lambda>addr. (if addr = irq_nat_encode inirq then {(ctrl, irq_nat_encode outirq)}
-          else {(aa, irq_nat_encode b) |aa b. \<exists>x. (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and> xa \<in> CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode addr)) \<and> (aa, b) \<in> x}))"
-    apply(subst TH_NOLAMBDA) (* Why doesnt this work? It contains exactly the same
-                                    just not wrapped in a lambda.... *)
-    sorry
-    
   show ?thesis
     apply(simp only:R1)
     apply(simp only:R21)
     apply(simp add:L1 add:L2 add:L3)
-    apply(simp add:TH_LAMBDA) 
+    apply(simp add:lifts_inner) 
     done
-    
-    
 qed
-  
-
-    
+     
   
 end
