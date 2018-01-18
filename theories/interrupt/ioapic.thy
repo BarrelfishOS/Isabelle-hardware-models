@@ -1,6 +1,6 @@
 (*
 
-Copyright (c) 2017, ETH Zurich
+Copyright (c) 2017, 2018, ETH Zurich
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -27,15 +27,40 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 (*<*)
 theory ioapic
-  imports interrupt Main Set  "../model/Model" "../model/Syntax"
+  imports x86int interrupt Main Set  "../model/Model" 
 begin
 (*>*)
-    
+
+(* Source: 82093AA Datasheet *)
+
+(* ------------------------------------------------------------------------- *)  
+subsection "Register level representation of IOAPIC"
+(* ------------------------------------------------------------------------- *)   
+record IOAPIC =
+  max_red_entries :: nat (* The maximum number of supported redirection entries *)
+  arb :: nat
+  ioredtbl :: "nat \<Rightarrow> IOREDTBL_ENTRY"
+   
+
+definition ioapic_well_formed :: "IOAPIC \<Rightarrow> bool" where
+  "ioapic_well_formed io \<longleftrightarrow>
+    (arb io) < 16 \<and>
+    (\<forall>x. x < (max_red_entries io) \<longrightarrow> ioredtbl_entry_well_formed ((ioredtbl io) x)    )"
+
+(* Given a register state of IOAPIC, describe the interrupt mapping *)
+definition ioapic_to_map :: "IOAPIC \<Rightarrow> (IRQ \<Rightarrow> IRQ set)"
+  where "ioapic_to_map io = (\<lambda>i. 
+      if irq_is_empty i \<and> port i < 24  then ioredtbl_entry_to_irq_dest ((ioredtbl io) (port i)) else {})"
+
+
+(* ------------------------------------------------------------------------- *)  
+subsection "Intuitive definitions of IOAPIC"
+(* ------------------------------------------------------------------------- *)   
 definition ioapic_mapvalid_indiv_dom_valid :: "IRQ set \<Rightarrow> bool"
   where "ioapic_mapvalid_indiv_dom_valid xs  \<longleftrightarrow>  (\<forall>x \<in> xs. format x = FEMPTY)"
     
 definition ioapic_mapvalid_indiv_res_valid_one :: "IRQ \<Rightarrow> bool"
-  where "ioapic_mapvalid_indiv_res_valid_one outi =  (((format outi) = FVECTOR)  \<and> (snd (irq outi)) \<ge> 32 \<and> (snd (irq outi)) < 235 )"
+  where "ioapic_mapvalid_indiv_res_valid_one outi =  (case format outi of FVECTOR a \<Rightarrow> a \<ge> 32 \<and> a < 23)"
     
 definition ioapic_mapvalid_indiv_res_valid :: "IRQ set \<Rightarrow> bool"
   where "ioapic_mapvalid_indiv_res_valid xs =  (if is_singleton xs then ioapic_mapvalid_indiv_res_valid_one (the_elem xs) else False)"

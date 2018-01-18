@@ -64,7 +64,12 @@ record SYSTEM =
 (* ------------------------------------------------------------------------- *)  
 subsection "IRQ / IRQ Format definitions"
 (* ------------------------------------------------------------------------- *)   
-(* IRQ is of format FMEMWRITE *)
+definition irq_is_empty :: "IRQ \<Rightarrow> bool"
+  where "irq_is_empty x = (case format x of FEMPTY \<Rightarrow> True | _ \<Rightarrow> False)"
+
+definition irq_is_vector :: "IRQ \<Rightarrow> bool"
+  where "irq_is_vector x = (case format x of FVECTOR _ \<Rightarrow> True | _ \<Rightarrow> False)"
+
 definition irq_is_memwrite :: "IRQ \<Rightarrow> bool"
   where "irq_is_memwrite x = (case format x of FMEMWRITE a b \<Rightarrow> True | _ \<Rightarrow> False)"
 
@@ -106,7 +111,7 @@ definition irq_nat_decode :: "nat \<Rightarrow> IRQ" where
      port = (snd (prod_decode n)) \<rparr>"
 
 lemma format_enc_inv[simp]: "irq_format_nat_decode(irq_format_nat_encode x) = x"
-  by(case_tac x, simp_all add:irq_format_nat_encode_def add:irq_format_nat_decode_def)  
+  by(case_tac x, simp_all add:irq_format_nat_encode_def irq_format_nat_decode_def)  
 
 lemma format_dec_inv_0:
   assumes e1: "x=0"
@@ -337,26 +342,17 @@ proof -
             {(ctrl, (irq_nat_encode outirq, {}))} = \<lparr>accept = {}, translate =
             \<lambda>a. if (fst a) = irq_nat_encode inirq then {(ctrl, (irq_nat_encode outirq, {}))}
              else translate \<lparr>accept = {}, translate = conf_to_translate sys ctrl\<rparr> a\<rparr>"
-    apply(simp add:replace_node_def add:mk_node_def)
-    done
+    by(simp add:replace_node_def mk_node_def)
 
   have R21: "translate \<lparr>accept = {}, translate = conf_to_translate sys ctrl\<rparr> =
       (\<lambda>addr. {(a, (irq_nat_encode b, {}))
          |a b. \<exists>x. (\<exists>xa. x = {(ctrl, \<lparr>format = format xa, port = port xa\<rparr>)} \<and>
          xa \<in> CONTROLLER.map (fst (controller sys ctrl)) (irq_nat_decode (fst addr))) \<and> (a, b) \<in> x})"
-    apply(auto)
-    apply(simp add:conf_to_translate_def add:conf_to_translate_mod_def add:irq_set_to_name_set_def
-        add:net_set_translate_def)
-    apply(simp add:ident_net add:ident_net_def)
-    apply(simp add:sys_ctrl_act_conf_def)
-    done
+    by(simp add:conf_to_translate_def conf_to_translate_mod_def irq_set_to_name_set_def 
+                  net_set_translate_def ident_net ident_net_def sys_ctrl_act_conf_def)
 
-  show ?thesis
-    apply(simp only:R1)
-    apply(simp only:R21)
-    apply(simp add:L1 add:L2 add:L3)
-    apply(simp add:lifts_inner)
-    done
+  show ?thesis 
+    by(simp only:R1, simp only:R21, simp add:L1 L2 L3 lifts_inner)
 qed
   
 end
