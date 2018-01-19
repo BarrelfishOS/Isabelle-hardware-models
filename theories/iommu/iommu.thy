@@ -78,17 +78,47 @@ text "Assignment of devices to domains. The root table is a 256 entry table
 subsection "Context Entries and Root Table"
 (* ------------------------------------------------------------------------- *)
 
+datatype AGAW = AGAW39 | AGAW48 | AGAW57 
+
+primrec addrbits :: "AGAW \<Rightarrow> nat" where
+  "addrbits(AGAW39)  = 39"  | 
+  "addrbits(AGAW48)  = 48"  |
+  "addrbits(AGAW57)  = 57"  
+
+(*
+
+• 00b: Untranslated requests are translated using second-level
+paging structures referenced through SLPTPTR field. Translated
+requests and Translation Requests are blocked.
+• 01b: Untranslated, Translated and Translation Requests are
+supported. This encoding is treated as reserved by hardware
+implementations not supporting Device-TLBs (DT=0 in Extended
+Capability Register).
+• 10b: Untranslated requests are processed as pass-through.
+SLPTPTR field is ignored by hardware. Translated and Translation
+Requests are blocked. This encoding is treated by hardware as
+reserved for hardware implementations not supporting Pass
+Through (PT=0 in Extended Capability Register).
+
+ *)
+datatype TTYPE = T_ONLY_TRANSLATE | T_ALLOW_ALL | T_ONLY_PASSTHROUGH
+
 record ContextEntry = 
-  present :: bool
-  addresswidth :: nat
-  addresstype :: nat
-  ptpointer :: nat
-  domainid :: nat
+  present      :: bool
   faultdisable :: bool
+  ttype        :: TTYPE
+  slptptr      :: nat
+  addrwidth    :: AGAW
+  domid        :: nat
+
+
 
 record RootTableEntry = 
-  present :: bool  
-  ctxtptr :: nat
+  (* This field indicates whether the root-entry is present. *)
+  present :: bool
+ (* Pointer to Context-table for this bus. The Context-table is 
+    4KB in size and size-aligned. *)
+  ctp :: nat \<Rightarrow> ContextEntry
   
 
 
@@ -97,11 +127,64 @@ record RootTableEntry =
 subsection "Extended Context Entries Root Table"
 (* ------------------------------------------------------------------------- *)
 
+datatype PageAttribute = 
+  PAT_UC | (* Uncacheable *)
+  PAT_WC | (* Write_Combining *)
+  PAT_WT | (* Write Through *)
+  PAT_WP | (* Write Protected *)
+  PAT_WB | (* Write Back *)
+  PAT_UC2 (* Uncached *)
+
+datatype ExtendeMemoryType = 
+  EMT_UC |
+  EMT_WB 
+
+datatype TTYPEE = TE_HOST_DTLB_DISABLE | 
+                  TE_HOST_DTLB_ENABLE | 
+                  TE_HOST_PASSTHROUGH |
+                  TE_GUEST_DTLB_DISABLE |
+                  TE_GUEST_DTLB_ENABLE 
+                 
+
+record ContextEntryExtended = 
+  pasidstptr :: nat
+  pasidptr :: nat
+  pts :: nat 
+  pat :: PageAttribute (* TODO: x8 *)
+  slee :: bool
+  ere :: bool
+  eafe :: bool
+  smep :: bool
+  domid :: nat
+  emte :: bool
+  cd :: bool
+  wpe :: bool
+  nxe :: bool
+  pge :: bool
+  addwidth :: AGAW
+  slptptr :: nat
+  paside :: bool
+  neste :: bool
+  pre :: bool
+  dinve :: bool
+  emt :: ExtendeMemoryType
+  ttypee :: TTYPEE
+  faultdisable :: bool
+  present :: bool
+  
+
 record RootTableEntryExtended = 
-  lowerpresent :: bool
-  lowerctxtptr :: nat
-  upperpresent :: bool
-  upperctxtptr :: nat
+  upresent :: bool
+  uctp :: nat \<Rightarrow> ContextEntryExtended
+  lpresent :: bool
+  lctp :: nat \<Rightarrow> ContextEntryExtended
+
+
+
+(* ------------------------------------------------------------------------- *)
+subsection "Equivalence of Entries and their Extended Version"
+(* ------------------------------------------------------------------------- *)
+
 
 
 (* ------------------------------------------------------------------------- *)
