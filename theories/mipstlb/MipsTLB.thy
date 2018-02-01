@@ -2706,7 +2706,13 @@ proof -
   finally show ?thesis .
 qed
 
-  
+
+lemma WellFormed :
+  assumes valid : "TLBValid tlb"
+  shows "wf_node (ConvertToNode nid tlb)"
+  by(simp add:ConvertToNode_def EntryToMap_def wf_node_def)
+
+
 (* ========================================================================= *)  
 section "TLB Exceptions"
 (* ========================================================================= *)   
