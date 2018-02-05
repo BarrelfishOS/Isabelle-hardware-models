@@ -2308,16 +2308,25 @@ qed
 (* ------------------------------------------------------------------------- *)   
 subsection "TLB Write Index"  
 (* ------------------------------------------------------------------------- *)   
-
-definition tlbwi :: "nat \<Rightarrow> TLBENTRY \<Rightarrow> MIPSTLB \<Rightarrow> MIPSTLB set"
-  where "tlbwi idx e tlb = (if idx < (capacity tlb) then 
-                               {\<lparr> capacity = (capacity tlb),
-                                  wired = (wired tlb),  
-                                  random = random tlb,
-                                  entries = (entries tlb)(idx :=  e) \<rparr>}
-                            else 
-                               UNIV)"
   
+  definition tlbwi :: "nat \<Rightarrow> TLBENTRY \<Rightarrow> MIPSTLB \<Rightarrow> MIPSTLB set"
+    where "tlbwi idx e tlb = (if idx < (capacity tlb) then 
+                                 {\<lparr> capacity = (capacity tlb),
+                                    wired = (wired tlb),  
+                                    random = random tlb,
+                                    entries = (entries tlb)(idx :=  e) \<rparr>}
+                              else 
+                                 UNIV)"
+
+  
+  definition tlbwi2 :: "nat \<Rightarrow> TLBENTRY \<Rightarrow> MIPSTLB \<Rightarrow> MIPSTLB set"
+    where "tlbwi2 idx e tlb = (if idx < (capacity tlb) then 
+                                 {\<lparr> capacity = (capacity tlb),
+                                    wired = (wired tlb),  
+                                    random = random tlb,
+                                    entries = (entries tlb)(idx :=  e) \<rparr>}
+                              else 
+                                 UNIV)"
     
 lemma "\<And>tlb e.  (capacity tlb) > 0 \<Longrightarrow> tlbwi ((vpn2 (hi (e))) mod (capacity tlb)) e tlb =
            {\<lparr> capacity = (capacity tlb), 
@@ -2566,6 +2575,19 @@ definition ConvertToNode :: "nodeid \<Rightarrow> MIPSTLB \<Rightarrow> node" wh
   "ConvertToNode nid tlb =
     \<lparr> accept = {},
       translate = (\<lambda> a. \<Union>i<(capacity tlb). EntryToMap nid (entries tlb i) a) \<rparr>"
+
+definition ConvertFromNode :: "nat \<Rightarrow> node \<Rightarrow> MIPSTLB set" where
+  "ConvertFromNode nid n = (if (\<exists>tlb. ConvertToNode nid tlb = n) then 
+        {SOME tlb. ConvertToNode nid tlb = n }  else {})"
+
+lemma "\<And>tlb. ConvertFromNode nid (ConvertToNode nid tlb) = {tlb}"
+  apply(auto simp add:ConvertFromNode_def )
+  
+  oops
+
+lemma " \<And>tlba tlb. F tlba = F tlb \<Longrightarrow> (SOME tlba. F tlba = F tlb) = tlb"
+
+
 
   
 (* ========================================================================= *)  

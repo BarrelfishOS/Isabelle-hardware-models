@@ -78,12 +78,13 @@ text "Assignment of devices to domains. The root table is a 256 entry table
 subsection "Context Entries and Root Table"
 (* ------------------------------------------------------------------------- *)
 
-datatype AGAW = AGAW39 | AGAW48 | AGAW57 
+datatype AGAW = AGAW39 | AGAW48 | AGAW57 | AGAW0
 
 primrec addrbits :: "AGAW \<Rightarrow> nat" where
   "addrbits(AGAW39)  = 39"  | 
   "addrbits(AGAW48)  = 48"  |
-  "addrbits(AGAW57)  = 57"  
+  "addrbits(AGAW57)  = 57"  |
+  "addrbits(AGAW0)   = 0"
 
 (*
 
@@ -118,9 +119,10 @@ record RootTableEntry =
   present :: bool
  (* Pointer to Context-table for this bus. The Context-table is 
     4KB in size and size-aligned. *)
-  ctp :: nat \<Rightarrow> ContextEntry
+  ctp :: "nat \<Rightarrow> ContextEntry"
   
-
+record RootTable = 
+   entries :: "nat \<Rightarrow> RootTableEntry"
 
 
 (* ------------------------------------------------------------------------- *)
@@ -135,7 +137,7 @@ datatype PageAttribute =
   PAT_WB | (* Write Back *)
   PAT_UC2 (* Uncached *)
 
-datatype ExtendeMemoryType = 
+datatype EMT = 
   EMT_UC |
   EMT_WB 
 
@@ -167,23 +169,58 @@ record ContextEntryExtended =
   neste :: bool
   pre :: bool
   dinve :: bool
-  emt :: ExtendeMemoryType
+  emt :: EMT
   ttypee :: TTYPEE
   faultdisable :: bool
   present :: bool
-  
+
+definition NULL_ContexEntryExtended :: ContextEntryExtended
+  where "NULL_ContexEntryExtended = \<lparr> 
+    pasidstptr = 0,
+    pasidptr = 0,
+    pts  = 0,
+    pat = PAT_UC, (* TODO: x8 *)
+    slee = False,
+    ere = False,
+    eafe = False,
+    smep = False,
+    domid = 0,
+    emte = False,
+    cd = False,
+    wpe = False,
+    nxe = False,
+    pge = False,
+    addwidth = AGAW0,
+    slptptr  = 0,
+    paside = False,
+    neste = False,
+    pre = False,
+    dinve = False,
+    emt = EMT_UC,
+    ttypee = TE_HOST_DTLB_DISABLE,
+    faultdisable = False,
+    present = False
+\<rparr>"
 
 record RootTableEntryExtended = 
   upresent :: bool
-  uctp :: nat \<Rightarrow> ContextEntryExtended
+  uctp :: "nat \<Rightarrow> ContextEntryExtended"
   lpresent :: bool
-  lctp :: nat \<Rightarrow> ContextEntryExtended
+  lctp :: "nat \<Rightarrow> ContextEntryExtended"
 
-
+record RootTableExtended = 
+  entries :: "nat \<Rightarrow> RootTableEntryExtended"
 
 (* ------------------------------------------------------------------------- *)
 subsection "Equivalence of Entries and their Extended Version"
 (* ------------------------------------------------------------------------- *)
+
+definition context_to_extended :: "ContextEntry \<Rightarrow> ContextEntryExtended "
+  where "context_to_extended c = NULL_ContexEntryExtended"
+
+definition convert_to_extended :: "RootTableEntry \<Rightarrow> RootTableEntryExtended"
+  where "convert_to_extended = \<lparr> upresent = 0, uctp = 0, 
+                                 lpresent = 0, lctp = 0  \<rparr>"
 
 
 

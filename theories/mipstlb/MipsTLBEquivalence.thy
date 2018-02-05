@@ -69,8 +69,8 @@ definition addr2vpn :: "addr \<Rightarrow> VPN"
 definition addr2asid :: "addr \<Rightarrow> ASID"
   where "addr2asid a = (fst a) div VASize"
 
-definition pfn2addr :: "PFN \<Rightarrow> addr"
-  where "pfn2addr p = (p * 4096, {})"
+definition pfn2addr :: "PFN \<Rightarrow> addr \<Rightarrow> addr"
+  where "pfn2addr p va = (p * 4096 + (fst va) mod 4096, {})"
 
 definition AddrValid :: "addr \<Rightarrow> bool"
   where "AddrValid a = ((fst a) < VASize * ASIDMax)"
@@ -88,13 +88,13 @@ lemma AddrValid_implies_inrange2 :
 definition MipsTLBPT_to_node :: "nodeid \<Rightarrow> MipsTLBPT \<Rightarrow> node"
   where "MipsTLBPT_to_node nid mpt =  \<lparr> accept = {},
          translate = (\<lambda>a. (if AddrValid a then 
-         (\<Union>x\<in> (MipsTLBPT_translate mpt (addr2asid a) (addr2vpn a)). {(nid, pfn2addr x)} )  else {} ))  \<rparr>"
+         (\<Union>x\<in> (MipsTLBPT_translate mpt (addr2asid a) (addr2vpn a)). {(nid, pfn2addr x a)} )  else {} ))  \<rparr>"
 
 
 definition MIPSLARGE_to_node :: "nodeid \<Rightarrow> MIPSTLB \<Rightarrow> node"
   where "MIPSLARGE_to_node nid t =  \<lparr> accept = {},
         translate = (\<lambda>a.  (if AddrValid a then 
-        (\<Union>x\<in> (MIPSTLB_translate t (addr2asid a) (addr2vpn a)). {(nid, pfn2addr x)} ) else {} ))  \<rparr>"
+        (\<Union>x\<in> (MIPSTLB_translate t (addr2asid a) (addr2vpn a)). {(nid, pfn2addr x a)} ) else {} ))  \<rparr>"
 
 
 
@@ -102,8 +102,8 @@ lemma Equiv :
   assumes cap: "capacity (tlb mpt) > 0"
       and valid: "MipsTLBPT_valid mpt"
       and avalid: "AddrValid a"
-    shows "(\<Union>x\<in>MipsTLBPT_translate mpt (addr2asid a) (addr2vpn a). {(nid, pfn2addr x)})  = 
-           ( \<Union>x\<in>MIPSTLB_translate (MipsTLBLarge_create (pte mpt)) (addr2asid a) (addr2vpn a). {(nid, pfn2addr x)})"
+    shows "(\<Union>x\<in>MipsTLBPT_translate mpt (addr2asid a) (addr2vpn a). {(nid, pfn2addr x a)})  = 
+           ( \<Union>x\<in>MIPSTLB_translate (MipsTLBLarge_create (pte mpt)) (addr2asid a) (addr2vpn a). {(nid, pfn2addr x a)})"
 proof -
   from avalid have X0: "addr2asid a < ASIDMax"
     by(auto simp:AddrValid_implies_inrange2)
@@ -122,19 +122,19 @@ lemma
   shows "MipsTLBPT_to_node nid mpt = 
          MIPSLARGE_to_node nid (MipsTLBLarge_create (pte mpt))"
 proof -
-  have X0:  "MipsTLBPT_to_node nid mpt =  \<lparr>accept = {}, translate = \<lambda>a. if AddrValid a then \<Union>x\<in>MipsTLBPT_translate mpt (addr2asid a) (addr2vpn a). {(nid, pfn2addr x)} else {}\<rparr>"
+  have X0:  "MipsTLBPT_to_node nid mpt =  \<lparr>accept = {}, translate = \<lambda>a. if AddrValid a then \<Union>x\<in>MipsTLBPT_translate mpt (addr2asid a) (addr2vpn a). {(nid, pfn2addr x a)} else {}\<rparr>"
     by(simp add:MipsTLBPT_to_node_def)
 
-  have X1: " MIPSLARGE_to_node nid (MipsTLBLarge_create (pte mpt)) =  \<lparr>accept = {}, translate = \<lambda>a. if AddrValid a then \<Union>x\<in>MIPSTLB_translate (MipsTLBLarge_create (pte mpt)) (addr2asid a) (addr2vpn a). {(nid, pfn2addr x)} else {}\<rparr>"
+  have X1: " MIPSLARGE_to_node nid (MipsTLBLarge_create (pte mpt)) =  \<lparr>accept = {}, translate = \<lambda>a. if AddrValid a then \<Union>x\<in>MIPSTLB_translate (MipsTLBLarge_create (pte mpt)) (addr2asid a) (addr2vpn a). {(nid, pfn2addr x a)} else {}\<rparr>"
     by(simp add:MIPSLARGE_to_node_def)
 
-  from cap valid have X2: "\<And>a. (if AddrValid a then \<Union>x\<in>MipsTLBPT_translate mpt (addr2asid a) (addr2vpn a). {(nid, pfn2addr x)} else {}) = 
-             (if AddrValid a then \<Union>x\<in>MIPSTLB_translate (MipsTLBLarge_create (pte mpt)) (addr2asid a) (addr2vpn a). {(nid, pfn2addr x)} else {})"
+  from cap valid have X2: "\<And>a. (if AddrValid a then \<Union>x\<in>MipsTLBPT_translate mpt (addr2asid a) (addr2vpn a). {(nid, pfn2addr x a)} else {}) = 
+             (if AddrValid a then \<Union>x\<in>MIPSTLB_translate (MipsTLBLarge_create (pte mpt)) (addr2asid a) (addr2vpn a). {(nid, pfn2addr x a)} else {})"
     by(auto simp:Equiv)
 
 
-  from X0 cap valid have X3 :  " \<lparr>accept = {}, translate = \<lambda>a. if AddrValid a then \<Union>x\<in>MipsTLBPT_translate mpt (addr2asid a) (addr2vpn a). {(nid, pfn2addr x)} else {}\<rparr> = 
-                  \<lparr>accept = {}, translate = \<lambda>a. if AddrValid a then \<Union>x\<in>MIPSTLB_translate (MipsTLBLarge_create (pte mpt)) (addr2asid a) (addr2vpn a). {(nid, pfn2addr x)} else {}\<rparr>"
+  from X0 cap valid have X3 :  " \<lparr>accept = {}, translate = \<lambda>a. if AddrValid a then \<Union>x\<in>MipsTLBPT_translate mpt (addr2asid a) (addr2vpn a). {(nid, pfn2addr x a)} else {}\<rparr> = 
+                  \<lparr>accept = {}, translate = \<lambda>a. if AddrValid a then \<Union>x\<in>MIPSTLB_translate (MipsTLBLarge_create (pte mpt)) (addr2asid a) (addr2vpn a). {(nid, pfn2addr x a)} else {}\<rparr>"
     by(simp only:X2)
 
   from X0 X1 X2 show ?thesis by(auto)
