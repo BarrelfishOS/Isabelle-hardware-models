@@ -2580,12 +2580,6 @@ definition ConvertFromNode :: "nat \<Rightarrow> node \<Rightarrow> MIPSTLB set"
   "ConvertFromNode nid n = (if (\<exists>tlb. ConvertToNode nid tlb = n) then 
         {SOME tlb. ConvertToNode nid tlb = n }  else {})"
 
-lemma "\<And>tlb. ConvertFromNode nid (ConvertToNode nid tlb) = {tlb}"
-  apply(auto simp add:ConvertFromNode_def )
-  
-  oops
-
-lemma " \<And>tlba tlb. F tlba = F tlb \<Longrightarrow> (SOME tlba. F tlba = F tlb) = tlb"
 
 
 
